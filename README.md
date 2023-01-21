@@ -7,13 +7,13 @@ many symbols and concepts from APL and BQN, but has several important
 differences.
 
 
-## Using `lmno`
+<!-- ## Using `lmno`
 
 At time of writing, there are no ready-made packages for `lmno` that can be
 easily downloaded and integrated into another project. Besides that, `lmno` is
 very experimental and is undergoing a lot of frequent significant changes. To
 experiment with `lmno`, one can download the source repository and build and
-experiment with it using [`bpt`](https://bpt.pizza/).
+experiment with it using [`bpt`](https://bpt.pizza/). -->
 
 
 ## The Basic API
