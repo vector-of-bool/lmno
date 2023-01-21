@@ -188,16 +188,16 @@ not apply:
 2 × (3 + 7)
 ```
 
-To force a different parse, parenthesis must be used.
+To force a different parse, parentheses must be used.
 
 
 ### Shifting Precedence with "`:`" and "`.`"
 
 The *tight* expression and the *loose* expression separators are used to adjust
-precedence without needing parenthesis (and I believe are unique to `lmno`).
+precedence without needing parentheses (and I believe are unique to `lmno`).
 
 A sequence of expressions separated by a colon "`:`" is equivalent to wrapping
-those expressions in parenthesis and replacing the colon with a blank space.
+those expressions in parentheses and replacing the colon with a blank space.
 
 ```py
 2 + |:bar - 5
