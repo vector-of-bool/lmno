@@ -1,0 +1,21 @@
+compiler_id: gnu
+cxx_compiler: g++-11
+cxx_version: c++20
+debug: true
+runtime: { debug: true }
+flags:
+  - -fsanitize=address
+link_flags:
+  - -fsanitize=address
+  - -fuse-ld=lld
+cxx_flags:
+  - -fconcepts-diagnostics-depth=10
+  - -finput-charset=utf-8
+warning_flags:
+  - -Werror
+  - -Wsign-compare
+  - -Wconversion
+compiler_launcher:
+  - python3
+  - -u
+  - ./unmangle.py

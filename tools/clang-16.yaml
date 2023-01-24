@@ -1,0 +1,17 @@
+compiler_id: gnu
+cxx_compiler: clang++-16
+cxx_version: c++20
+debug: true
+runtime: { debug: true }
+optimize: false
+cxx_flags:
+  - -finput-charset=utf-8
+  - -fno-elide-type
+warning_flags:
+  - -Werror
+  - -Wsign-compare
+  - -Wconversion
+compiler_launcher:
+  - python3
+  - -u
+  - ./unmangle.py

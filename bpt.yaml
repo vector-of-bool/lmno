@@ -1,0 +1,30 @@
+name: lmno
+version: 0.1.0
+
+dependencies:
+  - neo-fun@0.13.0
+  - nameof@0.10.2
+  - boost.pfr@2.0.2
+
+test-dependencies:
+  - catch2@2.13.9 using main
+
+readme: README.md
+description: |
+  The is the lmno project. Hello!
+
+## Point to the project's homepage on the web
+# homepage: example.com
+
+## The source-control repository of the project
+# repository: example.com/lmno/source
+
+## A URL to the documentation for the project
+# documentation: example.com/lmno/docs
+
+## Specify an SPX License ID for the project
+# license:
+
+# List the authors of the project
+authors:
+  - Colby Pike <vectorofbool@gmail.com>
