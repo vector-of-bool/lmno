@@ -86,4 +86,7 @@ using reverse = reverser<L>::type;
  */
 #define LMNO_TYPEOF(...) ::neo::remove_cvref_t<decltype(__VA_ARGS__)>
 
+template <typename Func, typename... Ts>
+using apply_f = typename Func::template f<Ts...>;
+
 }  // namespace lmno::meta

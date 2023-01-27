@@ -18,6 +18,9 @@ namespace lmno {
 
 namespace invoke_detail {
 
+/**
+ * All the magic of lmno::invoke is hidden behind this class template, defined later in this file
+ */
 template <bool JustFalse>
 struct pick_invoker;
 
@@ -122,6 +125,20 @@ struct invoke_indirect {
 template <typename F>
 explicit invoke_indirect(F&) -> invoke_indirect<F>;
 
+/**
+ * @brief Annotation within a class body that declares a call operator that does
+ * the error-checking semantics of lmno::invoke()
+ *
+ * Use this within a class that you wish to use as a function-object, but want
+ * lmno::invoke to catch errors and decode them for callers.
+ *
+ * IMPORTANT: Instead of defining your own operator(), define a call() function
+ * that accepts the same arguments and is properly constrained. The indirect
+ * invoker will attempt to invoke your function via `.call()` instead of `operator()`.
+ *
+ * Define a static member function template "error()" to render error messages
+ * in case of constraint failures.
+ */
 #define LMNO_INDIRECT_INVOCABLE(ThisType)                                                          \
     template <typename... Args, typename This = ThisType&>                                         \
     constexpr auto operator()(Args&&... args)                                       /**/           \
@@ -140,36 +157,63 @@ explicit invoke_indirect(F&) -> invoke_indirect<F>;
 
 namespace invoke_detail {
 
+using meta::apply_f;
+
+/**
+ * @brief Conditionally apply unconst_t to a type
+ *
+ * @tparam DoUnconst If true, applies unconst_t
+ *
+ * Invoke this with the template alias member `f`
+ */
 template <bool DoUnconst>
 struct unconst_arg {
+    // False: DO NOT apply any type transform
     template <typename T>
     using f = T;
 };
 
 template <>
 struct unconst_arg<true> {
+    // True: DO apply unconst_t
     template <typename T>
     using f = unconst_t<T>;
 };
 
+/**
+ * @brief Basic invoker implementation. Applies the given casts to each argument before forwarding
+ * those arguments to the underlying invocable.
+ *
+ * @tparam Cast A list of casting-classes, applied via the member template alias `f`
+ */
 template <typename... Cast>
 struct basic_invoker {
+    /// Calculate the result type
     template <typename F, typename... Args>
-    using result_t = neo::invoke_result_t<unconst_t<F>, typename Cast::template f<Args>...>;
+    using result_t = neo::invoke_result_t<
+        // We unconditionally strip const from the invocable, since it can never
+        // effect the result.
+        unconst_t<F>,
+        // Apply the caster to each argument
+        apply_f<Cast, Args>...>;
 
     template <typename F, typename... Args>
-    constexpr static bool is_nothrow_v = noexcept(
-        neo::invoke(NEO_DECLVAL(unconst_t<F>), NEO_DECLVAL(typename Cast::template f<Args>)...));
+    constexpr static bool is_nothrow_v
+        = noexcept(neo::invoke(NEO_DECLVAL(unconst_t<F>), NEO_DECLVAL(apply_f<Cast, Args>)...));
 
     template <typename F, typename... Args>
     constexpr static decltype(auto) invoke(F&& f, Args&&... args) noexcept(is_nothrow_v<F, Args...>)
     // -> result_t<F, Args...> // Clang chokes when this is used?
     {
         return neo::invoke(static_cast<unconst_t<F>&&>(f),
-                           static_cast<typename Cast::template f<Args>&&>(args)...);
+                           static_cast<apply_f<Cast, Args>&&>(args)...);
     }
 };
 
+/**
+ * @brief Special invoker that is selected if the return value can be placed in
+ * an lmno::Const<> typed-constant for returning to the caller.
+ */
 template <typename... Cast>
 struct const_wrapping_invoker {
     using base = basic_invoker<Cast...>;
@@ -177,6 +221,7 @@ struct const_wrapping_invoker {
     template <typename F, typename... Args>
     using result_t = Const<base::invoke(remove_cvref_t<F>{}, remove_cvref_t<Args>{}...)>;
 
+    // Evaluation is constexpr and happens at compile time, so it never throws
     template <typename...>
     constexpr static bool is_nothrow_v = true;
 
@@ -186,13 +231,10 @@ struct const_wrapping_invoker {
     }
 };
 
-template <typename Child, cx_str Message, typename F, typename... Args>
-struct [[nodiscard]] opaque_error : err::error_type<Message, Child> {
-    static constexpr void show() noexcept
-        requires neo::invocable2<F, Args...>
-    {}
-};
-
+/**
+ * @brief An error-handling invoker that handles the case that no invocation
+ * satisfies the constraints of the invocable object.
+ */
 struct uninvocable {
     template <typename...>
     constexpr static bool is_nothrow_v = true;
@@ -221,37 +263,6 @@ struct uninvocable {
     template <typename F, typename... Args>
     [[nodiscard]] constexpr static result_t<F, Args...>
     invoke(F&& f [[maybe_unused]], Args&&... args [[maybe_unused]]) noexcept {
-        return {};
-    }
-};
-
-template <typename... Cast>
-struct error_chain_explaining_invoker {
-    using base = basic_invoker<Cast...>;
-
-    template <typename...>
-    constexpr static bool is_nothrow_v = true;
-
-    template <typename F, typename... Args>
-    static constexpr auto make_error() {
-        constexpr auto M
-            = cx_fmt_v<"Object of type {:'} is not invocable with the given arguments {{{:}}}",
-                       render::type_v<F>,
-                       cx_str_join_v<", ", cx_fmt_v<"{:'}", render::type_v<Args>>...>>;
-        if constexpr (has_error_detail<F, typename Cast::template f<Args>...>) {
-            using explained = invoke_error_t<F, typename Cast::template f<Args>...>;
-            return err::error_type<M, explained>{};
-        } else {
-            using inner_error = typename base::template result_t<F, Args...>;
-            return err::error_type<M, inner_error>{};
-        }
-    }
-
-    template <typename F, typename... Args>
-    using result_t = decltype(make_error<unconst_t<F>, Args...>());
-
-    template <typename F, typename... Args>
-    [[nodiscard]] constexpr static result_t<F, Args...> invoke(F&&, Args&&...) noexcept {
         return {};
     }
 };
@@ -299,24 +310,28 @@ struct error_renderer {
     }
 };
 
-template <typename... Caster>
+/**
+ * @brief Pick the invoker for the given set of argument casts
+ *
+ * @tparam Caster The casts to apply to the arguments
+ */
+template <typename... Cast>
 struct pick_invoker_with_casts;
 
-template <bool ReturnsStructural_and_IsStateless>
-struct pick_invoker_for_const_wrapping;
-
-template <bool IsConstexpr>
-struct pick_is_constexpr;
-
-template <typename... Cast>
-struct const_wrapping_invoker;
-
+/**
+ * @brief Template that searches for the compination of casts that will result
+ * in the invocation succeeding.
+ *
+ * @tparam Stop The stop point for the iteration
+ * @tparam Mask The iteration step. Starts at zero. Stops at 'stop'
+ * @tparam Seq A sequence of 1s and 0s representing the casting set to try
+ * @tparam F The function
+ * @tparam Args The arguments
+ */
 template <std::size_t Stop, std::size_t Mask, typename Seq, typename F, typename... Args>
 struct find_cast_combo;
 
-template <std::size_t Stop, std::size_t Mask, typename Seq, typename F, typename... Args>
-struct find_cast_combo_for_errors;
-
+// Convert an unsigned integer into a set of powers of two bit masks
 template <std::size_t N, typename Seq = std::make_index_sequence<N>>
 constexpr auto make_bits_seq = 0;
 
@@ -327,63 +342,27 @@ template <>
 struct pick_invoker<false> {
     // We need to find the write combination of argument casts that will result in success
     template <typename F, typename... Args>
-    using f = find_cast_combo<(1 << sizeof...(Args)),
-                              0,
-                              decltype(make_bits_seq<sizeof...(Args)>),
-                              F,
-                              Args...>  //
-        ::template f<F, Args...>;
+    using f = apply_f<find_cast_combo<(1 << sizeof...(Args)),
+                                      0,
+                                      decltype(make_bits_seq<sizeof...(Args)>),
+                                      F,
+                                      Args...>,  //
+                      F,
+                      Args...>;
 };
-
-template <std::size_t Stop, std::size_t Mask, typename Seq, typename F, typename... Args>
-struct find_cast_combo_for_errors;
-
-template <std::size_t Stop, typename Seq, typename F, typename... Args>
-struct find_cast_combo_for_errors<Stop, Stop, Seq, F, Args...> {  // Stop condition
-    // Base error, the result is simply never invocable...
-    template <typename, typename...>
-    using f = error_renderer<uninvocable>;
-};
-
-template <std::size_t Stop, std::size_t Mask, auto... Ns, typename F, typename... Args>
-    requires neo::invocable<unconst_t<F>,
-                            typename unconst_arg<((1 << Ns) & Mask) != 0>::template f<Args>...>
-struct find_cast_combo_for_errors<Stop, Mask, std::index_sequence<Ns...>, F, Args...> {
-    template <typename, typename...>
-    using f  //= error_renderer<uninvocable>;
-        = error_renderer<error_chain_explaining_invoker<unconst_arg<((1 << Ns) & Mask) != 0>...>>;
-};
-
-// Recursive case: The selected casts do not result in a valid call.
-template <std::size_t Stop, std::size_t Mask, typename Seq, typename F, typename... Args>
-struct find_cast_combo_for_errors {
-    // Try the next set of cast bits:
-    template <typename, typename...>
-    using f = find_cast_combo_for_errors<Stop, Mask + 1, Seq, F, Args...>::template f<F, Args...>;
-};
-
-template <std::size_t Stop, std::size_t Mask, typename Seq, typename F, typename... Args>
-struct find_cast_combo;
 
 template <std::size_t Stop, typename Seq, typename F, typename... Args>
 struct find_cast_combo<Stop, Stop, Seq, F, Args...> {  // Stop condition
     template <typename, typename...>
-    using f = find_cast_combo_for_errors<Stop, 0, Seq, F, Args...>::template f<F, Args...>;
+    using f = error_renderer<uninvocable>;
 };
 
 template <std::size_t Stop, std::size_t Mask, auto... Bits, typename F, typename... Args>
-    requires check_invocable_without_error<
-        F,
-        typename unconst_arg<(Bits & Mask) != 0>::template f<Args>...>
+    requires check_invocable_without_error<F, apply_f<unconst_arg<(Bits & Mask) != 0>, Args>...>
 struct find_cast_combo<Stop, Mask, std::index_sequence<Bits...>, F, Args...> {
     // This is the one we want
     template <typename, typename...>
-    using f = pick_invoker_with_casts<unconst_arg<(Bits & Mask) != 0>...>  //
-        ::template f<
-            neo::invoke_result_t<unconst_t<F>,
-                                 typename unconst_arg<(Bits & Mask) != 0>::template f<Args>...>,
-            F,
-            Args...>;
+    using f = apply_f<pick_invoker_with_casts<unconst_arg<(Bits & Mask) != 0>...>, F, Args...>;
 };
 
 // Recursive case: The selected casts do not result in a valid call.
@@ -394,53 +373,38 @@ struct find_cast_combo {
     using f = find_cast_combo<Stop, Mask + 1, Seq, F, Args...>::template f<F, Args...>;
 };
 
+template <typename I, typename F, typename... Args>
+concept is_constexpr_invocation =  //
+    requires { typename lmno::Const<I::invoke(remove_cvref_t<F>{}, remove_cvref_t<Args>{}...)>; };
+
 template <typename... Cast>
 struct pick_invoker_with_casts {
+    template <typename F, typename... Args>
+    static auto pick() {
+        using basic = basic_invoker<Cast...>;
+        using Ret   = basic::template result_t<F, Args...>;
+        if constexpr (stateless<Ret> or not structural<Ret>) {
+            // Return type is stateless (we don't want to double-wrap)
+            // or not-structural, so we can't put the value in an NTTP
+            return basic{};
+        } else if constexpr (not stateless<remove_cvref_t<F>>
+                             or not(stateless<remove_cvref_t<Args>> and ...)) {
+            // The function/arguments aren't stateless, so we can't default-init them and be certain
+            // we'll get the same result on invocation.
+            return basic{};
+        } else if constexpr (not is_constexpr_invocation<basic, F, Args...>) {
+            // The invocation itself is not a constant expression, so we can't
+            // get a constexpr value to place in an NTTP
+            return basic{};
+        } else {
+            // It qualifies: Wrap the result in a Const<>:
+            return const_wrapping_invoker<Cast...>{};
+        }
+    }
+
     // Select an invoker based on the return type
-    template <typename Ret, typename F, typename... Args>
-    using f = pick_invoker_for_const_wrapping<
-        // Does it NOT return a stateless object?
-        //  - (We don't want to double-wrap, and we provide no value here)
-        not stateless<Ret>
-        // Does it return a structural type?
-        //  - (We can't wrap non-structural types)
-        and structural<Ret>
-        // Are both the invocable and all of its arguments stateless objects?
-        //  - (Otherwise not constexpr)
-        and stateless<remove_cvref_t<F>> and (stateless<remove_cvref_t<Args>> and ...)>  //
-        // Go on...
-        ::template f<basic_invoker<Cast...>, F, Args...>;
-};
-
-template <>
-struct pick_invoker_for_const_wrapping<false> {
-    // Not a stateless invocation, or the return type is not structural. Just do a regular invoke:
-    template <typename BaseInvoker, typename, typename...>
-    using f = BaseInvoker;
-};
-
-template <>
-struct pick_is_constexpr<false> {
-    // Base case: Not a constexpr invocable, even though it qualified in every
-    // other way
-    template <typename BaseInvoker>
-    using f = BaseInvoker;
-};
-
-template <>
-struct pick_is_constexpr<true> {
-    template <typename BaseInvoker>
-    using f = neo::meta::rebind<BaseInvoker, const_wrapping_invoker>;
-};
-
-template <>
-struct pick_invoker_for_const_wrapping<true> {
-    template <typename BaseInvoker, typename F, typename... Args>
-    using f = pick_is_constexpr<requires {
-                                    typename lmno::Const<
-                                        BaseInvoker::invoke(remove_cvref_t<F>{},
-                                                            remove_cvref_t<Args>{}...)>;
-                                }>::template f<BaseInvoker>;
+    template <typename F, typename... Args>
+    using f = decltype(pick<F, Args...>());
 };
 
 }  // namespace invoke_detail
