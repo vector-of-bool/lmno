@@ -46,13 +46,16 @@ using pick_invoker2_t = pick_invoker<false and sizeof...(Args)>::template f<F, A
  * @param fn The invocable object
  * @param args The arguments to apply to the invocable object
  */
-template <typename F,
-          typename... Args,
-          typename Invoker = invoke_detail::pick_invoker2_t<F, Args...>>
-constexpr typename Invoker::template result_t<F, Args...>
-invoke(F&& fn, Args&&... args) noexcept(Invoker::template is_nothrow_v<F, Args...>) {
-    return Invoker::invoke(static_cast<F&&>(fn), static_cast<Args&&>(args)...);
-}
+inline constexpr struct invoke_fn {
+    template <typename F,
+              typename... Args,
+              typename Invoker = invoke_detail::pick_invoker2_t<F, Args...>>
+    constexpr typename Invoker::template result_t<F, Args...> operator()(F&& fn,
+                                                                         Args&&... args) const
+        noexcept(Invoker::template is_nothrow_v<F, Args...>) {
+        return Invoker::invoke(static_cast<F&&>(fn), static_cast<Args&&>(args)...);
+    }
+} invoke;
 
 #define LMNO_INVOKES(...) NEO_RETURNS(::lmno::invoke(__VA_ARGS__))
 
@@ -72,10 +75,14 @@ using invoke_t = decltype(lmno::invoke(NEO_DECLVAL(F), NEO_DECLVAL(Args)...));
 template <typename F, typename... Args>
 concept invocable = non_error<invoke_t<F, Args...>>;  //
 
+template <typename F, typename... Args>
+concept nothrow_invocable
+    = invocable<F, Args...> and noexcept(invoke(NEO_DECLVAL(F), NEO_DECLVAL(Args)...));
+
 using neo::remove_cvref_t;
 
 template <typename F, typename... Args>
-using invoke_error_t = remove_cvref_t<unconst_t<F>>::template error_t<Args...>;
+using invoke_error_t = decltype(remove_cvref_t<unconst_t<F>>::template error<Args...>());
 
 template <typename F, typename... Args>
 concept has_error_detail =  //
@@ -100,15 +107,38 @@ template <typename F, typename... Args>
 using maybe_invoke_error_t
     = maybe_invoke_error<has_error_detail<F, Args...>>::template f<F, Args...>;
 
-namespace invoke_detail {
+template <typename F>
+struct invoke_indirect {
+    F& _wrapped;
+    template <typename... Args>
+    constexpr auto operator()(Args&&... args) const NEO_RETURNS(_wrapped.call(NEO_FWD(args)...));
 
-struct nocast {
-    template <typename T>
-    using f = T;
+    template <typename... Args>
+        requires requires { F::template error<Args...>(); }
+    constexpr static auto error() {
+        return F::template error<Args...>();
+    }
 };
+template <typename F>
+explicit invoke_indirect(F&) -> invoke_indirect<F>;
 
-template <typename T>
-using just_ident = nocast;
+#define LMNO_INDIRECT_INVOCABLE(ThisType)                                                          \
+    template <typename... Args, typename This = ThisType&>                                         \
+    constexpr auto operator()(Args&&... args)                                       /**/           \
+        noexcept(::lmno::nothrow_invocable<::lmno::invoke_indirect<This>, Args...>) /**/           \
+    {                                                                                              \
+        return ::lmno::invoke(::lmno::invoke_indirect{*this}, NEO_FWD(args)...);                   \
+    }                                                                                              \
+                                                                                                   \
+    template <typename... Args, typename This = ThisType const&>                                   \
+    constexpr auto operator()(Args&&... args) const                                 /**/           \
+        noexcept(::lmno::nothrow_invocable<::lmno::invoke_indirect<This>, Args...>) /**/           \
+    {                                                                                              \
+        return ::lmno::invoke(::lmno::invoke_indirect{*this}, NEO_FWD(args)...);                   \
+    }                                                                                              \
+    static_assert(true)
+
+namespace invoke_detail {
 
 template <bool DoUnconst>
 struct unconst_arg {
@@ -189,7 +219,8 @@ struct uninvocable {
     using result_t = decltype(make_error<unconst_t<F>, Args...>());
 
     template <typename F, typename... Args>
-    [[nodiscard]] constexpr static result_t<F, Args...> invoke(F&&, Args&&...) noexcept {
+    [[nodiscard]] constexpr static result_t<F, Args...>
+    invoke(F&& f [[maybe_unused]], Args&&... args [[maybe_unused]]) noexcept {
         return {};
     }
 };
@@ -319,8 +350,8 @@ template <std::size_t Stop, std::size_t Mask, auto... Ns, typename F, typename..
                             typename unconst_arg<((1 << Ns) & Mask) != 0>::template f<Args>...>
 struct find_cast_combo_for_errors<Stop, Mask, std::index_sequence<Ns...>, F, Args...> {
     template <typename, typename...>
-    using f = error_renderer<uninvocable>;
-    // = error_renderer<error_chain_explaining_invoker<unconst_arg<((1 << Ns) & Mask) != 0>...>>;
+    using f  //= error_renderer<uninvocable>;
+        = error_renderer<error_chain_explaining_invoker<unconst_arg<((1 << Ns) & Mask) != 0>...>>;
 };
 
 // Recursive case: The selected casts do not result in a valid call.
