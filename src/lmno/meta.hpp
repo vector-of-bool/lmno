@@ -89,4 +89,8 @@ using reverse = reverser<L>::type;
 template <typename Func, typename... Ts>
 using apply_f = typename Func::template f<Ts...>;
 
+// Declare a type as a pointer
+template <typename T>
+using ptr = T*;
+
 }  // namespace lmno::meta
