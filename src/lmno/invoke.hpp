@@ -32,7 +32,8 @@ concept check_invocable_without_error =  //
     };
 
 template <typename F, typename... Args>
-using pick_invoker2_t = pick_invoker<false and sizeof...(Args)>::template f<F, Args...>;
+using pick_invoker2_t
+    = pick_invoker<check_invocable_without_error<F, Args...>>::template f<F, Args...>;
 
 }  // namespace invoke_detail
 
@@ -110,20 +111,30 @@ template <typename F, typename... Args>
 using maybe_invoke_error_t
     = maybe_invoke_error<has_error_detail<F, Args...>>::template f<F, Args...>;
 
+template <typename T>
+concept declares_indirect_invocable
+    = requires { requires static_cast<bool>(T::declares_indirect_invocable); };
+
 template <typename F>
 struct invoke_indirect {
-    F& _wrapped;
+    NEO_NO_UNIQUE_ADDRESS F _wrapped;
+
+    using Fd = neo::remove_cvref_t<F>;
+
+    template <typename... Args>
+    constexpr auto operator()(Args&&... args) NEO_RETURNS(_wrapped.call(NEO_FWD(args)...));
+
     template <typename... Args>
     constexpr auto operator()(Args&&... args) const NEO_RETURNS(_wrapped.call(NEO_FWD(args)...));
 
     template <typename... Args>
-        requires requires { F::template error<Args...>(); }
+        requires requires { Fd::template error<Args...>(); }
     constexpr static auto error() {
-        return F::template error<Args...>();
+        return Fd::template error<Args...>();
     }
 };
 template <typename F>
-explicit invoke_indirect(F&) -> invoke_indirect<F>;
+explicit invoke_indirect(F&&) -> invoke_indirect<F>;
 
 /**
  * @brief Annotation within a class body that declares a call operator that does
@@ -138,6 +149,9 @@ explicit invoke_indirect(F&) -> invoke_indirect<F>;
  *
  * Define a static member function template "error()" to render error messages
  * in case of constraint failures.
+ *
+ * This macro can go away when we have deduced-this parameter support, since we
+ * can use a regular base class to define the "magic" operator().
  */
 #define LMNO_INDIRECT_INVOCABLE(ThisType)                                                          \
     template <typename... Args, typename This = ThisType&>                                         \
@@ -248,12 +262,13 @@ struct uninvocable {
                            render::type_v<F>,
                            cx_str_join_v<", ", cx_fmt_v<"{:'}", render::type_v<Args>>...>>;
             return err::error_type<M, explained>{};
-        } else {
+        } else if constexpr (neo::invocable2<F, Args...>) {
+            using E = neo::invoke_result_t<F, Args...>;
             constexpr auto M
                 = cx_fmt_v<"Object of type {:'} is not invocable with the given arguments {{{:}}}",
                            render::type_v<F>,
                            cx_str_join_v<", ", cx_fmt_v<"{:'}", render::type_v<Args>>...>>;
-            return err::error_type<M, void>{};
+            return err::error_type<M, E>{};
         }
     }
 
@@ -351,6 +366,15 @@ struct pick_invoker<false> {
                       Args...>;
 };
 
+template <>
+struct pick_invoker<true> {
+    // We can invoke it without any cast-dancing
+    template <typename F, typename... Args>
+    using f = apply_f<pick_invoker_with_casts<meta::just_t<unconst_arg<false>, Args>...>,  //
+                      F,
+                      Args...>;
+};
+
 template <std::size_t Stop, typename Seq, typename F, typename... Args>
 struct find_cast_combo<Stop, Stop, Seq, F, Args...> {  // Stop condition
     template <typename, typename...>
@@ -383,14 +407,12 @@ struct pick_invoker_with_casts {
     static auto pick() {
         using basic = basic_invoker<Cast...>;
         using Ret   = basic::template result_t<F, Args...>;
-        if constexpr (stateless<Ret> or not structural<Ret>) {
+        if constexpr (stateless<Ret> or not structural<Ret> or not stateless<remove_cvref_t<F>>
+                      or not(stateless<remove_cvref_t<Args>> and ...)) {
             // Return type is stateless (we don't want to double-wrap)
-            // or not-structural, so we can't put the value in an NTTP
-            return basic{};
-        } else if constexpr (not stateless<remove_cvref_t<F>>
-                             or not(stateless<remove_cvref_t<Args>> and ...)) {
-            // The function/arguments aren't stateless, so we can't default-init them and be certain
-            // we'll get the same result on invocation.
+            // OR: not-structural, so we can't put the value in an NTTP
+            // OR: The function/arguments aren't stateless, so we can't default-init them and be
+            // certain we'll get the same result on invocation.
             return basic{};
         } else if constexpr (not is_constexpr_invocation<basic, F, Args...>) {
             // The invocation itself is not a constant expression, so we can't
