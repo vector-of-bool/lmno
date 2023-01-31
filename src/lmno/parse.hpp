@@ -3,303 +3,370 @@
 #include "./ast.hpp"
 #include "./lex.hpp"
 
+// Expands to "typename", because I'm lazy
+#define tn typename
+
 namespace lmno {
 
-namespace detail {
+namespace parse_detail {
 
-// Sentinel representing the EOF token
-constexpr inline lex::token EOF_TOKEN = lex::token{"<eof>"};
+using lex::token;
+using lex::token_list;
+using namespace ast;
+using namespace meta;
+using neo::meta::split_at;
+using u64 = std::uint64_t;
 
-// Holds the result of a successful parse
-template <typename T, typename Tail>
-struct parse_result {
-    // The actual node that was generated
-    static constexpr T result{};
-    // The remaining tokens following the parse
-    static constexpr Tail tail{};
-
-    constexpr parse_result(T, Tail) {}
-
-    // Always 'true' for parse_result
-    constexpr static bool okay = true;
-};
-LMNO_AUTO_CTAD_GUIDE(parse_result);
-
-// Holds an error of a failed parse
-template <cx_str Error>
-struct parse_error {
-    // Always 'false' for parse_error
-    constexpr static bool okay = false;
+enum ikind {
+    k_done = 0,
+    k_name,
+    k_train,
+    k_block,
+    k_assign,
+    k_seq,
+    k_strand,
+    k_int,
+    k_nothing,
 };
 
-// Genreate a parse_error of the given string
-template <cx_str E>
-constexpr auto parse_error_v = parse_error<E>{};
-
-// Regroup a set of expressions according to the associativity rules
-template <typename T>
-struct parse_regroup;
-
-template <typename T>
-using parse_regroup_t = parse_regroup<std::remove_cvref_t<T>>::type;
-
-// If we have three expressions, that's a dyadic invocation (Note the reversal):
-template <typename Z, typename Y, typename X, typename... Tail>
-struct parse_regroup<meta::list<Z, Y, X, Tail...>>
-    : parse_regroup<meta::list<ast::dyad<X, Y, Z>, Tail...>> {};
-
-// Two expressions is a monadic invocation. It can only appear at the end of an expression sequence
-// (also reversed)
-template <typename Y, typename X>
-struct parse_regroup<meta::list<Y, X>> {
-    using type = ast::monad<X, Y>;
+// A node in the tree construction
+struct node {
+    // What kind of node?
+    ikind kind;
+    // Value associated with the token. Meaning on the kind.
+    u64 n;
 };
 
-// A single expression is just that expression:
-template <typename X>
-struct parse_regroup<meta::list<X>> {
+// Takes a list of expression nodes and collapse into a single prefix/infix expression
+// NOTE that the node list comes from the expression stack, which is in reverse order.
+template <tn Nodes>
+struct collapse_chain;
+
+// Handle three or more items:
+template <tn X, tn F, tn W, tn... More>
+struct collapse_chain<list<X, F, W, More...>>
+    // Bind the first three into a diadic item, and recurse:
+    : collapse_chain<list<dyad<W, F, X>, More...>> {};
+
+// Handle many items:
+template <tn X, tn F, tn W, tn F2, tn W2, tn F3, tn W3, tn F4, tn W4, tn... More>
+struct collapse_chain<list<X, F, W, F2, W2, F3, W3, F4, W4, More...>>
+    // Bind the first several into a chain of infixes:
+    : collapse_chain<list<dyad<W4, F4, dyad<W3, F3, dyad<W2, F2, dyad<W, F, X>>>>, More...>> {};
+
+// Base case: Two items:
+template <tn X, tn F>
+struct collapse_chain<list<X, F>> {
+    using type = monad<F, X>;
+};
+
+// Base case: One item:
+template <tn X>
+struct collapse_chain<list<X>> {
     using type = X;
 };
 
-struct parse_impl {
-    // Convert an integer token into the std::int64_t value
-    constexpr static std::int64_t parse_int(std::string_view sv) {
-        int fac = 1;
-        if (sv.starts_with("¯")) {
-            fac = -1;
-            sv  = sv.substr(2);  // drop two bytes for the prefix
+// Convert the array of node instructions into the AST node tree
+template <auto Tokens>
+struct executor {
+    // The unused "void" is to work around unimplemented CWG 727 fixes.
+    template <ikind K, tn = void>
+    struct step;
+
+    template <ikind K, tn = void>
+    struct parse;
+
+    /**
+     * @brief Run the parse:
+     *
+     * @tparam Nodes The array of nodes that will be used to construct the tree
+     * @tparam Idx The index into the array of nodes to execute. Begins at zero
+     * @tparam Stack An accumulator of ast:: nodes that we are building. When finished, should have
+     * one element.
+     */
+    template <auto Nodes, u64 Idx = 0, tn Stack = list<>>
+    using exec_parse_t = parse<Nodes[Idx].kind, void>::template f<Nodes, Idx, Stack>;
+
+    template <tn Void>
+    struct parse<k_done, Void> {
+        // Final state: Return the one node:
+        template <auto, auto, tn Stack>
+        using f = head<Stack>;
+    };
+
+    template <ikind K, tn Void>
+    struct parse {
+        // Get the step based on the kind of the node:
+        using MyStep = step<K>;
+        // Recursive case:
+        template <auto Nodes,
+                  auto Idx,
+                  // The stack that we receive:
+                  tn StackIn,
+                  // Apply the step function to the node and receive the transformed
+                  // stack:
+                  tn StackOut = MyStep::template f<Nodes[Idx].n, StackIn>>
+        // Recurse into the parser, to the next node instruction, with the new stack:
+        using f = exec_parse_t<Nodes, Idx + 1, StackOut>;
+    };
+
+    // A "·" node:
+    template <tn Void>
+    struct step<k_nothing, Void> {
+        template <u64, tn Stack>
+        using f = meta::push_front<Stack, nothing>;
+    };
+
+    // An integer literal:
+    template <tn Void>
+    struct step<k_int, Void> {
+        // Convert an integer token into the std::int64_t value
+        constexpr static std::int64_t parse_int(std::string_view sv) {
+            int fac = 1;
+            if (sv.starts_with("¯")) {
+                fac = -1;
+                sv  = sv.substr(2);  // drop two bytes for the prefix
+            }
+            std::int64_t ret = 0;
+            for (auto it = sv.begin(); it != sv.end(); ++it) {
+                ret *= 10;
+                ret += *it - '0';
+            }
+            return ret * fac;
         }
-        std::int64_t ret = 0;
-        for (auto it = sv.begin(); it != sv.end(); ++it) {
-            ret *= 10;
-            ret += *it - '0';
+
+        // Parse the Nth token as an integer:
+        template <u64 N, tn Stack>
+        using f = meta::push_front<Stack, Const<parse_int(std::string_view(Tokens[N]))>>;
+    };
+
+    template <tn Void>
+    struct step<k_name, Void> {
+        // Bind the Nth token as a name:
+        template <u64 N, tn Stack>
+        using f = meta::push_front<Stack, name<Tokens[N]>>;
+    };
+
+    template <tn Void>
+    struct step<k_block, Void> {
+        // Wrap the top AST node in an ast::block
+        template <u64,
+                  tn Stack,
+                  tn Head   = head<Stack>,
+                  tn Blk    = block<Head>,
+                  tn Tail   = tail<Stack>,
+                  tn Stack2 = push_front<Tail, Blk>>
+        using f = Stack2;
+    };
+
+    template <tn Void>
+    struct step<k_train, Void> {
+        // Collapse the prior 'Count' nodes into a single prefix/infix node:
+        template <u64 Count,
+                  tn  Stack,
+                  tn  Split = split_at<Stack, Count>,
+                  tn  Head  = head<Split>,
+                  tn  Tail  = second<Split>,
+                  tn AST    = tn collapse_chain<Head>::type>
+        using f = push_front<Tail, AST>;
+    };
+
+    template <tn Void>
+    struct step<k_strand, Void> {
+        // Collapse the prior 'Count' nodes into a strand node:
+        template <u64 Count,
+                  tn  Stack,
+                  tn  Split = split_at<Stack, Count>,
+                  tn  Head  = head<Split>,
+                  tn  Tail  = tail<Split>,
+                  tn  AST   = rebind<reverse<Head>, strand>>
+        using f = push_front<Tail, AST>;
+    };
+
+    template <tn Void>
+    struct step<k_assign, Void> {
+        // Create an assignment from the prior two nodes:
+        template <u64,
+                  tn Stack,
+                  tn Val = head<Stack>,
+                  tn ID  = second<Stack>,
+                  tn Asn = assignment<ID, Val>>
+        using f = push_front<tail<tail<Stack>>, Asn>;
+    };
+
+    template <tn Void>
+    struct step<k_seq, Void> {
+        // Wrap the prior 'Count' nodes in an ast::stmt_seq
+        template <u64 Count,
+                  tn  Stack,
+                  tn  Split = split_at<Stack, Count>,
+                  tn  Head  = head<Split>,
+                  tn  Tail  = tail<Split>,
+                  tn  Seq   = rebind<reverse<Head>, stmt_seq>>
+        using f = push_front<Tail, Seq>;
+    };
+};
+
+struct token_iter {
+    const token* _base;
+    // The current position in the token array
+    u64 pos = 0;
+
+    constexpr const token& get() const noexcept { return _base[pos]; }
+};
+
+struct parser3 {
+    constexpr static auto parse_primary(node*& into, token_iter& it) {
+        auto       tk = std::string_view(it.get());
+        const char c  = tk.front();
+        if (lex::is_alpha(c)) {
+            *into++ = {k_name, static_cast<u64>(it.pos)};
+            it.pos++;
+        } else if (lex::is_digit(c) or tk.starts_with("¯")) {
+            *into++ = {k_int, static_cast<u64>(it.pos)};
+            it.pos++;
+        } else if (c == '(') {
+            it.pos++;
+            parse_top(into, it);
+            if (it.get().str[0] != ')') {
+                throw "Imbalanced parentheses";
+            }
+            it.pos++;
+        } else if (c == '{') {
+            it.pos++;
+            parse_top(into, it);
+            *into++ = {k_block, 0};
+            if (it.get().str[0] != '}') {
+                throw "Imbalanced braces";
+            }
+            it.pos++;
+        } else if (tk == "·") {
+            *into++ = {k_nothing, 0};
+            it.pos++;
+        } else {
+            *into++ = {k_name, it.pos};
+            it.pos++;
         }
-        return ret * fac;
     }
 
-    // Regroup a sequence of function applications
-    auto regroup_result(auto res) {
-        return parse_result{parse_regroup_t<decltype(res.result)>(), res.tail};
+    constexpr static void parse_strand(node*& into, token_iter& it) {
+        parse_primary(into, it);
+        u64 n_exprs = 1;
+        while (it.get() == "‿") {
+            it.pos++;
+            parse_primary(into, it);
+            ++n_exprs;
+        }
+        if (n_exprs > 1) {
+            *into++ = {k_strand, n_exprs};
+        }
     }
 
-    // Expression-edge detection
-    constexpr static bool is_edge(auto r) {
-        return r.empty or r.starts_with(")") or r.starts_with("}") or r.starts_with(EOF_TOKEN)
-            or r.starts_with("⋄") or r.starts_with(".");
+    constexpr static auto parse_colon(node*& into, token_iter& it) {
+        parse_strand(into, it);
+        while (it.get().str[0] == ':') {
+            it.pos++;
+            parse_strand(into, it);
+            *into++ = {k_train, 2};
+        }
     }
 
-    auto parse_primary(auto toks) {
-        constexpr auto first = std::string_view(toks.head);
-        constexpr auto c     = first[0];
-        // Integer literals:
-        if constexpr (lex::is_digit(c) or first.starts_with("¯")) {
-            return parse_result{Const<parse_int(std::string_view(toks.head))>{}, toks.tail};
-
-        }
-        // Identifier names:
-        else if constexpr (lex::is_alpha(c)) {
-            return parse_result{ast::name<toks.head>{}, toks.tail};
-        }
-        // A sentinel for an invalid token:
-        else if constexpr (c == '\x1b') {
-            return parse_error_v<"An invalid token appears within the source">;
-        }
-        // The "nothing" token:
-        else if constexpr (std::string_view(toks.head) == "·") {
-            return parse_result{ast::nothing{}, toks.tail};
-        }
-        // The beginning of a function block:
-        else if constexpr (c == '{') {
-            auto blk = parse_stmt_seq(toks.tail);
-            if constexpr (not blk.okay) {
-                return blk;
-            } else {
-                if constexpr (not blk.tail.starts_with("}")) {
-                    return parse_error_v<"Missing closing brace '}' for a block">;
-                } else {
-                    return parse_result{ast::block<LMNO_TYPEOF(blk.result)>{}, blk.tail.tail};
-                }
+    constexpr static void parse_main(node*& into, token_iter& it) {
+        u64 n_exprs = 0;
+        while (1) {
+            parse_colon(into, it);
+            ++n_exprs;
+            const token& tk = it.get();
+            char         c  = tk.str[0];
+            if (c == ':' or c == ')' or c == '.' or c == '}' or c == 0 or tk == "⋄" or tk == "←") {
+                break;
             }
         }
-        // The beginning of a grouped subexpression:
-        else if constexpr (c == '(') {
-            auto inner = parse_stmt_seq(toks.tail);
-            if constexpr (not inner.okay) {
-                return inner;
-            } else {
-                if constexpr (inner.tail.starts_with(")")) {
-                    return parse_result{inner.result, inner.tail.tail};
-                } else {
-                    return parse_error_v<"Missing closing parenthesis in expression">;
-                }
+        if (n_exprs > 1) {
+            *into++ = {k_train, n_exprs};
+        }
+    }
+
+    constexpr static void parse_dots(node*& into, token_iter& it) {
+        u64 n_exprs = 0;
+        while (1) {
+            parse_main(into, it);
+            n_exprs++;
+            if (it.get().str[0] != '.') {
+                break;
             }
-        }
-        // Detect a missing expression:
-        else if constexpr (is_edge(toks) or toks.starts_with(":") or toks.starts_with("‿")
-                           or toks.starts_with("←") or toks.starts_with(".")) {
-            return parse_error_v<
-                cx_fmt_v<"Expected an expression, but got {:'}.", LMNO_CX_STR(toks.head)>>;
-        }
-        // Treat anything else as a name:
-        else {
-            return parse_result{ast::name<toks.head>{}, toks.tail};
-        }
-    }
-
-    template <typename... Elems>
-    auto parse_strand_seq(auto toks, meta::list<Elems...> l = {}) {
-        auto first = parse_primary(toks);
-        if constexpr (not first.okay) {
-            return first;
-        } else if constexpr (not first.tail.starts_with("‿")) {
-            return parse_result{fin_strand_seq(l, first.result), first.tail};
-        } else {
-            return parse_strand_seq(first.tail.tail, l.push_back(first.result));
-        }
-    }
-
-    template <typename... Elems, typename Fin>
-    auto fin_strand_seq(meta::list<Elems...>, Fin) {
-        return ast::strand<Elems..., Fin>{};
-    }
-
-    auto fin_strand_seq(meta::list<>, auto fin) { return fin; }
-
-    auto parse_col_seq(auto toks) {
-        auto first = parse_strand_seq(toks, meta::list<>{});
-        if constexpr (not first.okay) {
-            return first;
-        } else if constexpr (not first.tail.starts_with(":")) {
-            return first;
-        } else {
-            auto next = parse_col_seq(first.tail.tail);
-            if constexpr (not next.okay) {
-                return next;
-            } else {
-                return parse_result{ast::monad<neo::remove_cvref_t<decltype(first.result)>,
-                                               neo::remove_cvref_t<decltype(next.result)>>{},
-                                    next.tail};
+            it.pos++;
+            if (it.get().str[0] == '.') {
+                it.pos++;
+                continue;
             }
+            parse_colon(into, it);
+            ++n_exprs;
+        }
+        if (n_exprs > 1) {
+            *into++ = {k_train, n_exprs};
         }
     }
 
-    auto parse_fn_seq(auto toks) {
-        auto r = do_parse_fn_seq(toks, meta::list<>{});
-        if constexpr (not r.okay) {
-            return r;
-        } else {
-            return regroup_result(r);
+    constexpr static void parse_assign(node*& into, token_iter& it) {
+        parse_dots(into, it);
+        if (it.get() == "←") {
+            it.pos++;
+            parse_dots(into, it);
+            *into++ = {k_assign, 0};
         }
     }
 
-    auto do_parse_fn_seq(auto toks, auto acc) {
-        auto first = parse_col_seq(toks);
-        if constexpr (not first.okay) {
-            return first;
-        } else {
-            auto here = acc.push_front(first.result);
-            if constexpr (is_edge(first.tail) or first.tail.starts_with(":")) {
-                return parse_result{here, first.tail};
-            } else {
-                return do_parse_fn_seq(first.tail, here);
+    constexpr static void parse_seq(node*& into, token_iter& it) {
+        u64 n_exprs = 0;
+        while (1) {
+            parse_assign(into, it);
+            ++n_exprs;
+            if (it.get() != "⋄") {
+                break;
             }
+            it.pos++;
+        }
+        if (n_exprs > 1) {
+            *into++ = {k_seq, n_exprs};
         }
     }
 
-    auto parse_dot_seq(auto toks) {
-        auto r = do_parse_dot_seq(toks, meta::list<>{});
-        if constexpr (not r.okay) {
-            return r;
-        } else {
-            return regroup_result(r);
-        }
+    static constexpr void parse_top(node*& into, token_iter& it) { parse_seq(into, it); }
+
+    template <auto Arr>
+    static constexpr auto make_parser() {
+        std::array<node, Arr.size()* 2> ret = {};
+        token_iter                      iter{Arr.data()};
+        auto                            into = ret.data();
+        parse_top(into, iter);
+        *into = {k_done, 0};
+        return ret;
     }
 
-    auto do_parse_dot_seq(auto toks, auto acc) {
-        auto first = parse_fn_seq(toks);
-        if constexpr (not first.okay) {
-            return first;
-        } else {
-            auto here = acc.push_front(first.result);
-            if constexpr (not first.tail.starts_with(".")) {
-                return parse_result{here, first.tail};
-            } else {
-                // The tokens after the dot:
-                auto tail = first.tail.tail;
-                if constexpr (tail.starts_with(".")) {
-                    // Two subsequent dots:
-                    return do_parse_dot_seq(tail.tail, here);
-                } else {
-                    // Parse the next element as a tight expression:
-                    auto mid = parse_col_seq(tail);
-                    if constexpr (not mid.okay) {
-                        return mid;
-                    } else {
-                        auto then = here.push_front(mid.result);
-                        return do_parse_dot_seq(mid.tail, then);
-                    }
-                }
-            }
-        }
-    }
+    template <auto Arr, std::size_t... I>
+    static constexpr auto as_vlist(std::index_sequence<I...>) -> vlist<Arr[I]...>;
 
-    auto parse_assignment(auto toks) {
-        auto id = parse_primary(toks);
-        if constexpr (not id.okay) {
-            return id;
-        } else {
-            if constexpr (not id.tail.starts_with("←")) {
-                // Backtrack, parse again
-                return parse_dot_seq(toks);
-            } else {
-                auto rhs = parse_dot_seq(id.tail.tail);
-                if constexpr (not rhs.okay) {
-                    return rhs;
-                } else {
-                    return parse_result{ast::assignment<LMNO_TYPEOF(id.result),
-                                                        LMNO_TYPEOF(rhs.result)>{},
-                                        rhs.tail};
-                }
-            }
-        }
-    }
-
-    template <typename... Stmts>
-    auto parse_stmt_seq(auto toks, meta::list<Stmts...> l = {}) {
-        auto asn = parse_assignment(toks);
-        if constexpr (not asn.okay) {
-            return asn;
-        } else if constexpr (not asn.tail.starts_with("⋄")) {
-            return parse_result{fin_stmt_seq(l, asn.result), asn.tail};
-        } else {
-            return parse_stmt_seq(asn.tail.tail, l.push_back(asn.result));
-        }
-    }
-
-    template <typename... Stmts, typename Fin>
-    auto fin_stmt_seq(meta::list<Stmts...>, Fin) {
-        return ast::stmt_seq<Stmts..., Fin>{};
-    }
-
-    auto fin_stmt_seq(meta::list<>, auto n) { return n; }
-
-    template <lex::token... Toks>
-    auto parse_root(lex::token_list<Toks...>) {
-        auto r = parse_stmt_seq(lex::token_list<Toks..., EOF_TOKEN>{});
-        if constexpr (r.okay) {
-            return r.result;
-        } else {
-            return r;
-        }
+    template <token... Tokens>
+    auto parse(token_list<Tokens...>*) {
+        // Create a constexpr array of the tokens:
+        constexpr std::array<token, sizeof...(Tokens) + 1> arr = {Tokens...};
+        // Calculate an array that will instruct the expression regrouper
+        constexpr auto nodes = make_parser<arr>();
+        using ast            = executor<arr>::template exec_parse_t<nodes>;
+        return ptr<ast>{};
     }
 };
 
-}  // namespace detail
+}  // namespace parse_detail
 
-template <typename Tokens>
-using parse_tokens_t = decltype(detail::parse_impl{}.parse_root(Tokens{}));
+template <typename AST>
+using parse_tokens_t
+    = neo::remove_pointer_t<decltype(parse_detail::parser3{}.parse(meta::ptr<AST>{}))>;
 
-template <cx_str S>
-using parse_t = parse_tokens_t<lex::tokenize_t<S>>;
+template <cx_str Code>
+using parse_t = parse_tokens_t<lex::tokenize_t<Code>>;
 
 }  // namespace lmno
+
+#undef tn

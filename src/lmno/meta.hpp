@@ -6,18 +6,6 @@
 namespace lmno::meta {
 
 /**
- * @brief A simple typelist
- */
-template <typename... Ts>
-struct list {
-    template <typename U>
-    static list<U, Ts...> push_front(U);
-
-    template <typename U>
-    static list<Ts..., U> push_back(U);
-};
-
-/**
  * @brief A list of values
  *
  * @tparam Vs
@@ -26,20 +14,27 @@ template <auto... Vs>
 struct vlist;
 
 using neo::meta::append;
-using neo::meta::len_v;
-using neo::meta::map;
+using neo::meta::head;
+using neo::meta::list;
 using neo::meta::rebind;
-using neo::meta::remove_prefix;
+using neo::meta::second;
+using neo::meta::tail;
 
-template <typename... Ts>
-using listptr = list<Ts...>*;
+template <template <class...> class L, typename... Ts, typename V>
+auto push_front_fn(L<Ts...> const&, V const&) -> L<V, Ts...>;
+
+template <typename L, typename V>
+using push_front = decltype(push_front_fn(NEO_DECLVAL(L const&), NEO_DECLVAL(V const&)));
+
+template <typename T, typename...>
+using just_t = T;
 
 namespace detail {
 
 template <typename T, std::size_t N>
 struct type_reverser_base {};
 
-template <typename L, typename Seq = std::make_index_sequence<len_v<L>>>
+template <typename L, typename Seq = std::make_index_sequence<neo::meta::len_v<L>>>
 struct reverser_derived;
 
 template <template <class...> class L, typename... Ts, std::size_t... Ns>
@@ -54,7 +49,7 @@ struct reverser_ns {
 }  // namespace detail
 
 template <typename L,
-          std::size_t Len = len_v<L>,
+          std::size_t Len = neo::meta::len_v<L>,
           typename Seq    = std::make_index_sequence<Len>,
           typename D      = detail::reverser_derived<L, Seq>>
 struct reverser;
@@ -80,11 +75,6 @@ using reverse = reverser<L>::type;
 #define LMNO_AUTO_CTAD_GUIDE(Type)                                                                 \
     template <typename... Args>                                                                    \
     explicit Type(const Args&...)->Type<Args...>
-
-/**
- * @brief Obtain the type of the given expression, sans cvr-qualifiers
- */
-#define LMNO_TYPEOF(...) ::neo::remove_cvref_t<decltype(__VA_ARGS__)>
 
 template <typename Func, typename... Ts>
 using apply_f = typename Func::template f<Ts...>;
