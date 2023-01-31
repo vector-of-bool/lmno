@@ -28,7 +28,7 @@ BUILD:
             debug: true, \
             runtime: {debug: true}, \
             warning_flags: ["-Werror", "-Wsign-compare"], \
-            compiler_launcher: "ccache", \
+            compiler_launcher: "python3 -u tools/unmangle.py ccache", \
         }' \
         | tee toolchain.yaml
     RUN --mount=type=cache,target=/root/.ccache \
@@ -36,11 +36,10 @@ BUILD:
 
 build-alpine-gcc-11.2:
     FROM alpine:3.16
-    RUN apk add jq gcc "g++" musl-dev ccache
+    RUN apk add jq gcc "g++" musl-dev ccache python3
     DO +BUILD
 
-
-build-u22-gcc-12:
-    FROM ubuntu:22.04
-    RUN apt-get update && apt-get -y install gcc-12 g++-12 ccache jq
-    DO +BUILD --compiler="g++-12"
+build-alpine-gcc-12.2:
+    FROM alpine:3.17
+    RUN apk add jq gcc "g++" musl-dev ccache python3
+    DO +BUILD

@@ -18,4 +18,5 @@ warning_flags:
 compiler_launcher:
   - python3
   - -u
-  - ./unmangle.py
+  - tools/unmangle.py
+  - ccache
