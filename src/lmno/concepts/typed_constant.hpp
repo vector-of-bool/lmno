@@ -33,7 +33,7 @@ concept typed_constant =                                                       /
             // That type must be valid as a non-type template parameter
             requires structural<typename T::type>;
             // ::value must actually be of that type
-            { T::value } -> std::same_as<const typename T::type&>;
+            { T::value } -> neo::weak_same_as<const typename T::type&>;
             // We should be able to static_cast to the underlying type:
             static_cast<typename T::type>(c);
         };
@@ -65,10 +65,8 @@ struct unconst<true> {
 template <typename T>
 using unconst_t = detail::unconst<typed_constant<neo::remove_cvref_t<T>>>::template f<T>;
 
-template <typename T>
-constexpr unconst_t<T> unconst(T&& arg) noexcept {
-    return static_cast<unconst_t<T&&>>(arg);
-}
+constexpr inline auto unconst
+    = []<typename T>(T&& arg) -> unconst_t<T> { return static_cast<unconst_t<T&&>>(arg); };
 
 /**
  * @brief Match a typed_constant type that has an integral value

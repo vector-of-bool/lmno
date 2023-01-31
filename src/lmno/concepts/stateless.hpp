@@ -31,7 +31,7 @@ template <typename T>
 concept stateless =                   //
     enable_stateless_v<T> == true or  //
     requires {
-        requires std::same_as<decltype(enable_stateless_v<T>), const int>;
+        requires neo::weak_same_as<decltype(enable_stateless_v<T>), const int>;
         requires enable_stateless_v<T> == 0;
         // We can't use "is_literal", but being trivially destructible
         // is a reasonable substitute in most cases.
