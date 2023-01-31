@@ -242,13 +242,11 @@ calc_replace_size(std::string_view in, std::string_view find, std::size_t replac
 
 }  // namespace detail
 
-template <cx_str Fmt,
-          cx_sized_string... SizedStrings,
-          typename Ret = cx_str<detail::calc_fmt_size(Fmt.data(), SizedStrings{}...)>>
-constexpr Ret cx_fmt(const SizedStrings&... strings) {
-    Ret         ret;
-    const char* in  = Fmt.data();
-    char*       out = ret.data();
+template <cx_str Fmt, cx_sized_string... SizedStrings>
+constexpr auto cx_fmt(const SizedStrings&... strings) {
+    cx_str<detail::calc_fmt_size(Fmt.data(), SizedStrings{}...)> ret;
+    const char*                                                  in  = Fmt.data();
+    char*                                                        out = ret.data();
     (detail::format_another(out, in, strings), ...);
     while (*in) {
         *out++ = *in++;
