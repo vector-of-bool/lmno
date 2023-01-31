@@ -24,9 +24,7 @@ namespace lmno {
  */
 inline constexpr struct evaluate_fn {
     template <typename Code, typename Sema, typename Context>
-    constexpr decltype(auto) operator()(Code&& code, Sema&& sema, Context&& ctx) const
-        requires requires { sema.evaluate(ctx, code); }
-    {
+    constexpr decltype(auto) operator()(Code&& code, Sema&& sema, Context&& ctx) const {
         return sema.evaluate(ctx, code);
     }
 } evaluate;
@@ -41,20 +39,19 @@ inline constexpr struct evaluate_fn {
  */
 template <typename Code, typename Sema, typename BoundContext>
 struct closure {
-    NEO_NO_UNIQUE_ADDRESS Code         _code;
     NEO_NO_UNIQUE_ADDRESS Sema         _sema;
     NEO_NO_UNIQUE_ADDRESS BoundContext _bound;
 
     constexpr decltype(auto) operator()(auto&& x) const {
         auto inner = _bound.bind(lmno::make_named<"α">(ast::nothing{}),  //
                                  lmno::make_named<"ω">(NEO_FWD(x)));
-        return lmno::invoke(evaluate, _code, _sema, inner);
+        return invoke(evaluate, Code{}, _sema, inner);
     }
 
     constexpr decltype(auto) operator()(auto&& w, auto&& x) const {
         auto inner = _bound.bind(lmno::make_named<"α">(NEO_FWD(w)),  //
                                  lmno::make_named<"ω">(NEO_FWD(x)));
-        return lmno::invoke(evaluate, _code, _sema, inner);
+        return invoke(evaluate, Code{}, _sema, inner);
     }
 };
 LMNO_AUTO_CTAD_GUIDE(closure);
@@ -68,7 +65,10 @@ constexpr auto render::type_v<closure<Code, S, B>>
  */
 struct default_sema {
     // A typed constant evaluates to itself
-    constexpr auto evaluate(auto&&, typed_constant auto v) const noexcept { return v; }
+    template <typed_constant C>
+    constexpr C evaluate(auto&&, C v) const noexcept {
+        return v;
+    }
 
     // A dyadic invocation with an ast::nothing "·" on the left-hand is a monadic invocation
     template <typename Mid, typename Right>
@@ -90,7 +90,7 @@ struct default_sema {
         } else if constexpr (LMNO_IS_ERROR(fn)) {
             return fn;
         } else {
-            return lmno::invoke(NEO_FWD(fn), NEO_FWD(left), NEO_FWD(right));
+            return invoke(NEO_FWD(fn), NEO_FWD(left), NEO_FWD(right));
         }
     }
 
@@ -110,7 +110,7 @@ struct default_sema {
         } else if constexpr (LMNO_IS_ERROR(right)) {
             return right;
         } else {
-            return lmno::invoke(NEO_FWD(fn), NEO_FWD(right));
+            return invoke(NEO_FWD(fn), NEO_FWD(right));
         }
     }
 
@@ -119,12 +119,12 @@ struct default_sema {
     constexpr decltype(auto) evaluate(const auto& context, ast::strand<Elems...> s) const {
         // Capture the types of each element's evaluation:
         using eval_type = meta::list<decltype(this->evaluate(context, Elems{}))...>;
-        return this->eval_strand(context, s, eval_type{});
+        return this->eval_strand(context, s, meta::ptr<eval_type>{});
     }
 
     template <typename... Elems, typename... ElemEvals>
     constexpr auto
-    eval_strand(const auto& context, ast::strand<Elems...>, meta::list<ElemEvals...>) const {
+    eval_strand(const auto& context, ast::strand<Elems...>, meta::list<ElemEvals...>*) const {
         // Check that we will have a common reference
         if constexpr (not(neo::has_common_reference<unconst_t<ElemEvals>> and ...)) {
             return err::make_error<
@@ -140,9 +140,9 @@ struct default_sema {
     }
 
     // Evaluation of a function block generates a closure:
-    template <typename Code>
-    constexpr auto evaluate(const auto& context, ast::block<Code>) const {
-        auto c = lmno::closure{Code{}, *this, context};
+    template <typename Code, typename Ctx>
+    constexpr auto evaluate(const Ctx& context, ast::block<Code>) const {
+        auto c = lmno::closure<Code, default_sema, Ctx>{*this, context};
         return c;
     }
 
@@ -199,7 +199,7 @@ struct default_sema {
 
 template <typename Code>
 constexpr auto eval() -> invoke_t<evaluate_fn const&, Code, default_sema, default_context<>> {
-    return lmno::invoke(evaluate, Code{}, default_sema{}, default_context{});
+    return invoke(evaluate, Code{}, default_sema{}, default_context{});
 }
 
 template <cx_str CodeStr, typename Parsed = parse_t<CodeStr>>
