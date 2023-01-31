@@ -1,5 +1,8 @@
 #pragma once
 
+#include <neo/concepts.hpp>
+
+#include <cmath>
 #include <cstdint>
 #include <numeric>
 
@@ -36,7 +39,7 @@ public:
      *
      * The denominator will be 1
      */
-    [[nodiscard]] constexpr rational(std::integral auto n) noexcept
+    [[nodiscard]] constexpr rational(neo::integral auto n) noexcept
         : _priv_numerator{static_cast<std::int64_t>(n)}
         , _priv_denominator{1} {}
 
@@ -90,33 +93,47 @@ public:
         return rational{_priv_denominator, _priv_numerator};
     }
 
+    [[nodiscard]] constexpr double as_double() const noexcept {
+        return static_cast<double>(_priv_numerator) / static_cast<double>(_priv_denominator);
+    }
+
+    [[nodiscard]] constexpr std::int64_t ceil() const noexcept {
+        auto d = as_double();
+        return static_cast<std::int64_t>(std::ceil(d));
+    }
+
+    [[nodiscard]] constexpr std::int64_t floor() const noexcept {
+        auto d = as_double();
+        return static_cast<std::int64_t>(std::floor(d));
+    }
+
     // Math with other types will promote
     // +
-    [[nodiscard]] friend constexpr rational operator+(rational q, std::integral auto n) noexcept {
+    [[nodiscard]] friend constexpr rational operator+(rational q, neo::integral auto n) noexcept {
         return q + rational{n};
     }
-    [[nodiscard]] friend constexpr rational operator+(std::integral auto n, rational q) noexcept {
+    [[nodiscard]] friend constexpr rational operator+(neo::integral auto n, rational q) noexcept {
         return rational{n} + q;
     }
     // -
-    [[nodiscard]] friend constexpr rational operator-(rational q, std::integral auto n) noexcept {
+    [[nodiscard]] friend constexpr rational operator-(rational q, neo::integral auto n) noexcept {
         return q - rational{n};
     }
-    [[nodiscard]] friend constexpr rational operator-(std::integral auto n, rational q) noexcept {
+    [[nodiscard]] friend constexpr rational operator-(neo::integral auto n, rational q) noexcept {
         return rational{n} - q;
     }
     // ×
-    [[nodiscard]] friend constexpr rational operator*(rational q, std::integral auto n) noexcept {
+    [[nodiscard]] friend constexpr rational operator*(rational q, neo::integral auto n) noexcept {
         return q * rational{n};
     }
-    [[nodiscard]] friend constexpr rational operator*(std::integral auto n, rational q) noexcept {
+    [[nodiscard]] friend constexpr rational operator*(neo::integral auto n, rational q) noexcept {
         return rational{n} * q;
     }
     // ÷
-    [[nodiscard]] friend constexpr rational operator/(rational q, std::integral auto n) noexcept {
+    [[nodiscard]] friend constexpr rational operator/(rational q, neo::integral auto n) noexcept {
         return q / rational{n};
     }
-    [[nodiscard]] friend constexpr rational operator/(std::integral auto n, rational q) noexcept {
+    [[nodiscard]] friend constexpr rational operator/(neo::integral auto n, rational q) noexcept {
         return rational{n} / q;
     }
 };
@@ -124,14 +141,17 @@ public:
 constexpr rational operator""_Q(unsigned long long n) noexcept { return rational{n}; }
 constexpr rational operator""_Qr(unsigned long long n) noexcept { return rational{n}.recip(); }
 
+template <typename T>
+concept arithmetic = neo::integral<T> or neo::floating_point<T> or neo::weak_same_as<T, rational>;
+
 }  // namespace lmno
 
-template <std::integral I>
+template <neo::integral I>
 struct std::common_type<lmno::rational, I> {
     using type = lmno::rational;
 };
 
-template <std::integral I>
+template <neo::integral I>
 struct std::common_type<I, lmno::rational> {
     using type = lmno::rational;
 };

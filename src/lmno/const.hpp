@@ -19,31 +19,31 @@ struct Const : typed_constant_base {
     /**
      * @brief The actual value that is bound within the type
      */
-    static constexpr const auto& value = V;
+    static constexpr const Type& value = V;
 
     /**
      * @brief The type of the value of this constant.
      */
     using type = remove_cvref_t<decltype(V)>;
 
-    static_assert(std::same_as<type, Type>, "Do not specify a different type for Const<>");
+    static_assert(neo::same_as<type, Type>, "Do not specify a different type for Const<>");
 
     // An explicit conversion to the underlying type is allowed:
     constexpr explicit operator type const&() const noexcept { return value; }
 
     template <typename Other>
-        requires std::constructible_from<Other, const type&>
+        requires neo::constructible_from<Other, const type&>
     constexpr explicit operator Other() const noexcept {
         return static_cast<Other>(value);
     }
 
     template <auto U>
-        requires std::equality_comparable_with<type, decltype(U)>
+        requires neo::equality_comparable_with<type, decltype(U)>
     [[nodiscard]] constexpr bool operator==(Const<U>) const noexcept {
         return V == U;
     }
     template <auto U>
-        requires std::totally_ordered_with<type, decltype(U)>
+        requires neo::totally_ordered_with<type, decltype(U)>
     [[nodiscard]] constexpr auto operator<=>(Const<U>) const noexcept {
         return V <=> U;
     }
@@ -72,5 +72,8 @@ struct Const : typed_constant_base {
 
 template <std::int64_t N>
 using ConstInt64 = Const<N>;
+
+template <auto V>
+constexpr bool enable_stateless_v<Const<V>> = true;
 
 }  // namespace lmno

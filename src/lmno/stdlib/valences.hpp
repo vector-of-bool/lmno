@@ -24,11 +24,12 @@ struct polyfun {
     NEO_NO_UNIQUE_ADDRESS F _unary;
     NEO_NO_UNIQUE_ADDRESS G _binary;
 
-    constexpr auto call(auto&& x) LMNO_INVOKES(_unary, NEO_FWD(x));
-    constexpr auto call(auto&& x) const LMNO_INVOKES(_unary, NEO_FWD(x));
+    constexpr auto operator()(auto&& x) LMNO_INVOKES(_unary, NEO_FWD(x));
+    constexpr auto operator()(auto&& x) const LMNO_INVOKES(_unary, NEO_FWD(x));
 
-    constexpr auto call(auto&& w, auto&& x) LMNO_INVOKES(_binary, NEO_FWD(w), NEO_FWD(x));
-    constexpr auto call(auto&& w, auto&& x) const LMNO_INVOKES(_binary, NEO_FWD(w), NEO_FWD(x));
+    constexpr auto operator()(auto&& w, auto&& x) LMNO_INVOKES(_binary, NEO_FWD(w), NEO_FWD(x));
+    constexpr auto operator()(auto&& w, auto&& x) const
+        LMNO_INVOKES(_binary, NEO_FWD(w), NEO_FWD(x));
 
     template <typename X>
         requires requires { F::template error<X>(); }

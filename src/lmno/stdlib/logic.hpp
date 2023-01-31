@@ -17,15 +17,9 @@ constexpr inline auto _or
 
 constexpr inline auto _not = [](neo::integral auto x) -> int { return not x; };
 
-struct and_ : func_wrap<_and> {
-    LMNO_INDIRECT_INVOCABLE(and_);
-};
-struct or_ : func_wrap<_or> {
-    LMNO_INDIRECT_INVOCABLE(or_);
-};
-struct not_ : func_wrap<_not> {
-    LMNO_INDIRECT_INVOCABLE(not_);
-};
+struct and_ : func_wrap<_and> {};
+struct or_ : func_wrap<_or> {};
+struct not_ : func_wrap<_not> {};
 
 }  // namespace lmno::stdlib
 

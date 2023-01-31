@@ -51,7 +51,7 @@ template <neo::integral I>
 constexpr I identity_element<I, stdlib::times_or_sign> = I(1);
 
 template <neo::integral I>
-constexpr I identity_element<I, stdlib::divide> = I(1);
+constexpr I identity_element<I, stdlib::divide_or_reciprocal> = I(1);
 
 template <neo::integral I>
 constexpr int identity_element<I, stdlib::and_> = int(1);
@@ -363,9 +363,6 @@ constexpr inline auto define<"↑"> = stdlib::take{};
 template <typename Max, stdlib::iota_range<Max> R>
 constexpr auto render::value_of_type_v<stdlib::iota_range<Max>, R>
     = cx_fmt_v<"·⍳{}", render::value_v<R.mx>>;
-
-template <typename Max, auto I>
-constexpr Max meta::static_range_size_v<Const<I, stdlib::iota_range<Max>>> = I.mx;
 
 }  // namespace lmno
 

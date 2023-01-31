@@ -46,6 +46,54 @@ concept dividable_by =  //
         { (num / den) / den } -> multipliable<Denom>;
     };
 
+struct plus {
+    template <typename W>
+    constexpr auto operator()(W&& w, addable<W> auto&& x) const NEO_RETURNS(w + x);
+
+    template <typename X>
+    static auto error() {
+        return err::fmt_error_t<"The {:'} operator is not unary-invocable", cx_str{"+"}>{};
+    }
+
+    template <typename W, typename X>
+    static auto error() {
+        if constexpr (not addable<unconst_t<W>, unconst_t<X>>) {
+            return err::fmt_error_t<
+                "α of type {:'} and ω of type {:'} are not compatible by "
+                "arithmetic addition in (α + ω)",
+                render::type_v<W>,
+                render::type_v<X>>{};
+        }
+    }
+};
+
+inline auto _recip  = [] NEO_CTL(rational{_1}.recip());
+inline auto _divide = [] NEO_CTL(rational{_1} / _2);
+struct divide_or_reciprocal : polyfun<func_wrap<_recip>, func_wrap<_divide>> {
+    template <typename X>
+    static auto error() {
+        using render::type_v;
+        if constexpr (not neo::constructible_from<rational, unconst_t<X>>) {
+            return err::fmt_error_t<
+                "Value of type {:'} cannot be converted to a rational number (i.e. lmno::rational)",
+                type_v<X>>{};
+        }
+    }
+
+    template <typename W, typename X>
+    static auto error() {
+        using render::type_v;
+        using B = decltype(error<X>());
+        if constexpr (not neo::same_as<B, void>) {
+            return B{};
+        } else if constexpr (not dividable_by<rational, unconst_t<X>>) {
+            return err::fmt_error_t<
+                "Value of type {:'} is not valid as the divisor of a rational number",
+                type_v<X>>{};
+        }
+    }
+};
+
 constexpr inline auto _power = []<typename Base, typename Power>(const Base& b, Power p)
     requires requires {
                  { b* b } -> neo::weak_same_as<Base>;
@@ -59,175 +107,37 @@ constexpr inline auto _power = []<typename Base, typename Power>(const Base& b, 
     }
     return acc;
 };
+inline auto _exponential = [] NEO_CTL(_power(rational{271'801, 99'990}, _1));
 
-constexpr inline auto _mod
-    = []<typename Numer, neo::totally_ordered_with<Numer> Denom>(const Numer& b,
-                                                                 const Denom& d) noexcept  //
-    -> Numer { return std::modulus<>{}(b, d); };
+struct power_or_exponential : polyfun<func_wrap<_exponential>, func_wrap<_power>> {};
 
-constexpr inline auto _abs = []<neo::totally_ordered X>(const X& x) noexcept -> X
-    requires requires {
-                 static_cast<X>(0);
-                 { -x } -> neo::weak_same_as<X>;
-             }
-{
-    if (x < static_cast<X>(0)) {
-        return -x;
-    } else {
-        return x;
-    }
-};
+inline auto sign  = [] NEO_CTL((_1 < 0) ? -1 : (_1 > 0) ? 1 : 0);
+inline auto times = [](auto&& w, multipliable<decltype(w)> auto&& x) NEO_RETURNS_L(w * x);
 
-constexpr inline auto _exponential =
-    [](const auto& x) NEO_RETURNS_L(lmno::invoke(_power, rational{271'801, 99'990}, NEO_FWD(x)));
+struct times_or_sign : polyfun<func_wrap<sign>, func_wrap<times>> {};
 
-constexpr inline auto _equal
-    = []<typename W, neo::equality_comparable_with<W> X>(const W& w, const X& x) noexcept -> int {
-    return w == x;
-};
+inline auto negative = [] NEO_CTL(-_1);
+inline auto minus    = [] NEO_CTL(_1 - _2);
+struct minus_or_negative : polyfun<func_wrap<negative>, func_wrap<minus>> {};
 
-constexpr inline auto _not_equal
-    = []<typename W, neo::equality_comparable_with<W> X>(const W& w, const X& x) noexcept -> int {
-    return w != x;
-};
-
-constexpr inline auto _less
-    = []<typename W, neo::totally_ordered_with<W> X>(const W& w, const X& x) noexcept -> int {
-    using common = neo::common_reference_t<W, X>;
-    common w1    = w;
-    common x1    = x;
-    return std::compare_strong_order_fallback(w1, x1) < 0;
-};
-
-constexpr inline auto _less_equal
-    = []<typename W, neo::totally_ordered_with<W> X>(const W& w, const X& x) noexcept -> int {
-    using common = neo::common_reference_t<W, X>;
-    common w1    = w;
-    common x1    = x;
-    return std::compare_strong_order_fallback(w1, x1) <= 0;
-};
-
-constexpr inline auto _greater
-    = []<typename W, neo::totally_ordered_with<W> X>(const W& w, const X& x) noexcept -> int {
-    using common = neo::common_reference_t<W, X>;
-    common w1    = w;
-    common x1    = x;
-    return std::compare_strong_order_fallback(w1, x1) > 0;
-};
-
-constexpr inline auto _greater_equal
-    = []<typename W, neo::totally_ordered_with<W> X>(const W& w, const X& x) noexcept -> int {
-    using common = neo::common_reference_t<W, X>;
-    common w1    = w;
-    common x1    = x;
-    return std::compare_strong_order_fallback(w1, x1) >= 0;
-};
-
-constexpr inline auto _max = []<typename W, neo::totally_ordered_with<W> X>(W&& w, X&& x) noexcept
-    -> neo::common_reference_t<W, X> {
-    using common   = neo::common_reference_t<W, X>;
-    common w1      = w;
-    common x1      = x;
-    auto   compare = std::compare_strong_order_fallback(w1, x1);
-    if (compare < 0) {
-        return x;
-    } else {
-        return w;
-    }
-};
-
-constexpr inline auto _min = []<typename W, neo::totally_ordered_with<W> X>(W&& w, X&& x) noexcept
-    -> neo::common_reference_t<W, X> {
-    using common   = neo::common_reference_t<W, X>;
-    common w1      = w;
-    common x1      = x;
-    auto   compare = std::compare_strong_order_fallback(w1, x1);
-    if (compare < 0) {
-        return w;
-    } else {
-        return x;
-    }
-};
-
-struct plus {
-    LMNO_INDIRECT_INVOCABLE(plus);
-
-    template <typename W>
-    constexpr static auto call(W&& w, addable<W> auto&& x) NEO_RETURNS(w + x);
-
-    template <typename X>
+struct requires_equality_comparable {
+    template <typename W, typename X, typename Wu = unconst_t<W>, typename Xu = unconst_t<X>>
     static auto error() {
-        using show = err::shower<plus, X>;
-        return err::fmt_errorex_t<show, "The {:'} operator is not unary-invocable", cx_str{"+"}>{};
-    }
-
-    template <typename W, typename X>
-    static auto error() {
-        if constexpr (not addable<unconst_t<W>, unconst_t<X>>) {
-            return err::fmt_errorex_t<err::shower<plus, W, X>,
-                                      "α of type {:'} and ω of type {:'} are not compatible by "
-                                      "arithmetic addition in (α + ω)",
-                                      render::type_v<W>,
-                                      render::type_v<X>>{};
+        if constexpr (not neo::equality_comparable_with<W, X>) {
+            return err::fmt_error_t<
+                "Values of type {:'} are not equality-comparable with values of type {:'}",
+                render::type_v<W>,
+                render::type_v<X>>{};
         }
     }
 };
 
-constexpr inline auto _reciprocal = [](const auto& x) NEO_RETURNS_L(rational(x).recip());
-constexpr inline auto _divide     = [](const auto& w, const auto& x) NEO_RETURNS_L(rational{w} / x);
+inline auto _eq =
+    [](auto&& w, neo::equality_comparable_with<decltype(w)> auto&& x) NEO_RETURNS_L(w == x);
+struct equal : func_wrap<_eq>, requires_equality_comparable {};
 
-struct reciprocal : func_wrap<_reciprocal> {
-    template <typename X>
-    static auto error() {
-        using render::type_v;
-        if constexpr (not neo::constructible_from<rational, unconst_t<X>>) {
-            return err::fmt_error_t<
-                "Value of type {:'} cannot be converted to a rational number (i.e. lmno::rational)",
-                type_v<X>>{};
-        }
-    }
-};
-struct divide : func_wrap<_divide> {
-    template <typename W, typename X>
-    static auto error() {
-        using render::type_v;
-        if constexpr (not neo::constructible_from<rational, unconst_t<W>>) {
-            return err::fmt_error_t<
-                "Value of type {:'} cannot be converted to a rational number (i.e. lmno::rational)",
-                type_v<W>>{};
-        } else if constexpr (not dividable_by<rational, unconst_t<X>>) {
-            return err::fmt_error_t<
-                "Value of type {:'} is not valid as the divisor of a rational number",
-                type_v<X>>{};
-        }
-    }
-};
-
-struct power : func_wrap<_power> {};
-struct exponential : func_wrap<_exponential> {};
-
-struct times_or_sign {
-    LMNO_INDIRECT_INVOCABLE(times_or_sign);
-
-    constexpr static auto call(auto&& x) NEO_RETURNS((x < 0) ? -1 : 1);
-
-    template <typename L, multipliable<L> R>
-    constexpr static auto call(const L& l, const R& r) NEO_RETURNS(l* r);
-};
-
-struct minus_or_negative {
-    LMNO_INDIRECT_INVOCABLE(minus_or_negative);
-
-    constexpr static auto call(auto&& w, auto&& x) NEO_RETURNS(w - x);
-    constexpr static auto call(auto&& x) NEO_RETURNS(-x);
-};
-
-struct divide_or_reciprocal : polyfun<reciprocal, divide> {
-    LMNO_INDIRECT_INVOCABLE(divide_or_reciprocal);
-};
-struct power_or_exponential : polyfun<exponential, power> {
-    LMNO_INDIRECT_INVOCABLE(power_or_exponential);
-};
+inline auto _neq = [] NEO_CTL(not _eq(_1, _2));
+struct not_equal : func_wrap<_neq>, requires_equality_comparable {};
 
 struct requires_total_ordering {
     template <typename W, typename X, typename Wu = unconst_t<W>, typename Xu = unconst_t<X>>
@@ -241,40 +151,53 @@ struct requires_total_ordering {
     }
 };
 
-struct equal : func_wrap<_equal> {
-    LMNO_INDIRECT_INVOCABLE(equal);
-};
-struct not_equal : func_wrap<_not_equal> {
-    LMNO_INDIRECT_INVOCABLE(not_equal);
-};
-struct less : func_wrap<_less>, requires_total_ordering {
-    LMNO_INDIRECT_INVOCABLE(less);
-};
-struct less_equal : func_wrap<_less_equal>, requires_total_ordering {
-    LMNO_INDIRECT_INVOCABLE(less_equal);
-};
-struct greater : func_wrap<_greater>, requires_total_ordering {
-    LMNO_INDIRECT_INVOCABLE(greater);
-};
-struct greater_equal : func_wrap<_greater_equal>, requires_total_ordering {
-    LMNO_INDIRECT_INVOCABLE(greater_equal);
-};
-struct min : func_wrap<_min> {
-    LMNO_INDIRECT_INVOCABLE(min);
-};
-struct max : func_wrap<_max> {
-    LMNO_INDIRECT_INVOCABLE(max);
+// Bind the operands to their common_reference type, and the perform a three-way copmare
+inline auto normalize_and_compare
+    = []<typename W, neo::totally_ordered_with<W> X>(W&& w, X&& x) noexcept {
+          using common = neo::common_reference_t<W, X>;
+          common w1    = w;
+          common x1    = x;
+          return std::compare_strong_order_fallback(w1, x1);
+      };
+
+inline auto _lt = [] NEO_CTL(normalize_and_compare(_1, _2) < 0);
+struct less : func_wrap<_lt>, requires_total_ordering {};
+
+inline auto _lte = [] NEO_CTL(normalize_and_compare(_1, _2) <= 0);
+struct less_equal : func_wrap<_lte>, requires_total_ordering {};
+
+inline auto _gt = [] NEO_CTL(normalize_and_compare(_1, _2) > 0);
+struct greater : func_wrap<_gt>, requires_total_ordering {};
+
+inline auto _gte = [] NEO_CTL(normalize_and_compare(_1, _2) >= 0);
+struct greater_equal : func_wrap<_gte>, requires_total_ordering {};
+
+inline auto _min   = [] NEO_CTL(_lt(_1, _2) ? _1 : _2);
+inline auto _floor = [] NEO_CTL(rational{_1}.floor());
+struct min_or_floor : polyfun<func_wrap<_floor>, func_wrap<_min>>, requires_total_ordering {};
+
+inline auto _max  = [] NEO_CTL(+(_lt(unconst(_1), unconst(_2)) ? unconst(_2) : unconst(_1)));
+inline auto _ceil = [] NEO_CTL(rational{unconst(_1)}.ceil());
+
+struct max_or_ceil : polyfun<func_wrap<_ceil>, func_wrap<_max>>, requires_total_ordering {};
+
+inline auto mod = [] NEO_CTL(_1 % _2);
+
+constexpr inline auto abs = []<typename X>(const X& x) noexcept -> X
+    requires requires {
+                 requires neo::totally_ordered<X>;
+                 static_cast<X>(0);
+                 { -x } -> neo::weak_same_as<X>;
+             }
+{
+    if (x < static_cast<X>(0)) {
+        return -x;
+    } else {
+        return x;
+    }
 };
 
-struct abs : func_wrap<_abs> {
-    LMNO_INDIRECT_INVOCABLE(abs);
-};
-struct mod : func_wrap<_mod> {
-    LMNO_INDIRECT_INVOCABLE(mod);
-};
-struct abs_or_mod : polyfun<abs, mod> {
-    LMNO_INDIRECT_INVOCABLE(abs_or_mod);
-};
+struct mod_or_abs : polyfun<func_wrap<abs>, func_wrap<mod>> {};
 
 }  // namespace lmno::stdlib
 
@@ -299,9 +222,9 @@ DECL_DEFINE(">", "greater-than", stdlib::greater);
 DECL_DEFINE("≥", "greater-than-or-equal-to", stdlib::greater_equal);
 DECL_DEFINE("<", "less-than", stdlib::less);
 DECL_DEFINE("≤", "less-than-or-equal-to", stdlib::less_equal);
-DECL_DEFINE("⌊", "minumum", stdlib::min);  // TODO: Define ceil with rationals
-DECL_DEFINE("⌈", "maxumum", stdlib::max);  // TODO: Define floor with rationals
-DECL_DEFINE("|", "modulus/absolute-value", stdlib::abs_or_mod);
+DECL_DEFINE("⌊", "minumum/floor", stdlib::min_or_floor);
+DECL_DEFINE("⌈", "maxumum/ceiling", stdlib::max_or_ceil);
+DECL_DEFINE("|", "modulus/absolute-value", stdlib::mod_or_abs);
 #undef DECL_DEFINE
 
 }  // namespace lmno

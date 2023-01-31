@@ -81,8 +81,8 @@ struct const_fn {
 
     constexpr auto operator()(auto&&) NEO_RETURNS(_value);
     constexpr auto operator()(auto&&) const NEO_RETURNS(_value);
-    constexpr auto operator()(auto&&, auto&& x) NEO_RETURNS(_value(NEO_FWD(x)));
-    constexpr auto operator()(auto&&, auto&& x) const NEO_RETURNS(_value(NEO_FWD(x)));
+    constexpr auto operator()(auto&&, auto&&) NEO_RETURNS(_value);
+    constexpr auto operator()(auto&&, auto&&) const NEO_RETURNS(_value);
 };
 LMNO_AUTO_CTAD_GUIDE(const_fn);
 
@@ -91,7 +91,7 @@ LMNO_AUTO_CTAD_GUIDE(const_fn);
  * wrap an object in a const_fn
  */
 template <typename T>
-constexpr bool autoconst_v = std::is_arithmetic_v<T>;
+constexpr bool autoconst_v = lmno::arithmetic<T>;
 
 template <>
 constexpr bool autoconst_v<rational> = true;
@@ -114,7 +114,7 @@ constexpr decltype(auto) autoconst_fn(T&& arg) noexcept {
     if constexpr (stdlib::autoconst_v<remove_cvref_t<T>>) {
         return stdlib::const_fn{NEO_FWD(arg)};
     } else {
-        return unconst(NEO_FWD(arg));
+        return NEO_FWD(arg);
     }
 }
 
