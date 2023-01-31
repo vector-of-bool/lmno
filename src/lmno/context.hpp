@@ -137,8 +137,11 @@ struct scope<named_value<Names, Types>...> {
     constexpr static bool has_name_v = ((N == Names) or ...);
 
     template <lex::token Name>
+    using named_t = decltype(detail::get_named<Name>(NEO_DECLVAL(tuple)).get());
+
+    template <lex::token Name>
         requires has_name_v<Name>
-    constexpr decltype(auto) get() const noexcept {
+    constexpr named_t<Name> get() const noexcept {
         return detail::get_named<Name>(_values).get();
     }
 
