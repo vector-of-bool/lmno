@@ -31,7 +31,7 @@ C<"Hello, world!"> _1 [[maybe_unused]]
 = C<lmno::cx_str_replace<"Hello, wrold?!", cx_str{"wrold?"}, cx_str{"world"}>()>{};
 
 C<"foo    baz  foo baz"> _2 [[maybe_unused]]
-= C<lmno::cx_str_replace<"foo bar bar bar baz bar foobar baz", cx_str{"bar"}, cx_str{""}>()>{};
+= C<lmno::cx_str_replace<"foo bar bar bar baz bar foobar baz", "bar", cx_str{""}>()>{};
 
 }  // namespace
 

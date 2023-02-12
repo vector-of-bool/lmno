@@ -52,12 +52,12 @@ static_assert(std::same_as<lmno::parse_t<"foo (bar) .. baz">,
 static_assert(std::same_as<lmno::parse_t<"foo {bar} .. baz">,
                            monad<monad<name<"foo">, block<name<"bar">>>, name<"baz">>>);
 
-static_assert(std::same_as<lmno::parse_t<"foo ⋄ bar">, stmt_seq<name<"foo">, name<"bar">>>);
+static_assert(std::same_as<lmno::parse_t<"foo ; bar">, stmt_seq<name<"foo">, name<"bar">>>);
 
-static_assert(std::same_as<lmno::parse_t<"foo ⋄ bar ⋄ baz">,
+static_assert(std::same_as<lmno::parse_t<"foo ; bar ; baz">,
                            stmt_seq<name<"foo">, name<"bar">, name<"baz">>>);
 
-static_assert(std::same_as<lmno::parse_t<"(foo ⋄ bar) ⋄ baz">,
+static_assert(std::same_as<lmno::parse_t<"(foo ; bar) ; baz">,
                            stmt_seq<stmt_seq<name<"foo">, name<"bar">>, name<"baz">>>);
 
 static_assert(std::same_as<lmno::parse_t<"foo ← 3">, assignment<name<"foo">, ConstInt64<3>>>);

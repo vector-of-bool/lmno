@@ -27,9 +27,9 @@ static_assert(render_v<lmno::parse_t<"foo bar : baz">> == "foo (bar baz)");
 static_assert(render_v<lmno::parse_t<"foo bar : baz quux">> == "foo (bar baz) quux");
 static_assert(render_v<lmno::parse_t<"foo bar baz : quux">> == "foo bar (baz quux)");
 
-static_assert(render_v<lmno::parse_t<"foo ⋄ bar">> == "foo ⋄ bar");
-static_assert(render_v<lmno::parse_t<"foo  ←   two ⋄ bar">> == "foo ← two ⋄ bar");
-static_assert(render_v<lmno::parse_t<"foo  ←  {5⊸+} ⋄ bar">> == "foo ← {5 ⊸ +} ⋄ bar");
+static_assert(render_v<lmno::parse_t<"foo ; bar">> == "foo ; bar");
+static_assert(render_v<lmno::parse_t<"foo  ←   two ; bar">> == "foo ← two ; bar");
+static_assert(render_v<lmno::parse_t<"foo  ←  {5⊸+} ; bar">> == "foo ← {5 ⊸ +} ; bar");
 static_assert(ast::render_value_v<int, 12> == "12");
 static_assert(ast::render_value_v<int, 0> == "0");
 static_assert(ast::render_value_v<int, -210> == "¯210");

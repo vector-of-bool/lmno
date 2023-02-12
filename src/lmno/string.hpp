@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <string_view>
 
 namespace lmno {
@@ -14,7 +15,7 @@ namespace lmno {
  */
 template <std::size_t N>
 struct cx_str {
-    char chars[N + 1] = {0};
+    char _chars[N + 1] = {0};
 
     cx_str()              = default;
     cx_str(const cx_str&) = default;
@@ -22,7 +23,7 @@ struct cx_str {
     // Copy from an array
     constexpr cx_str(const char (&arr)[N + 1]) noexcept {
         auto src = arr;
-        auto dst = chars;
+        auto dst = _chars;
         for (auto i = 0u; i < N; ++i) {
             dst[i] = src[i];
         }
@@ -30,21 +31,27 @@ struct cx_str {
 
     // Copy from a string_view
     constexpr explicit cx_str(std::string_view s) noexcept {
-        auto dst = chars;
+        auto dst = _chars;
         auto src = s.data();
+        assert(s.size() == N);
         for (auto i = 0u; i < N; ++i) {
             dst[i] = src[i];
         }
     }
 
     // Implicit convert to a string_view
-    constexpr operator std::string_view() const noexcept { return std::string_view(chars, N); }
+    constexpr operator std::string_view() const noexcept { return std::string_view(_chars, N); }
 
     // Obtain a pointer to the string data. (null terminated)
-    constexpr char*       data() noexcept { return chars; }
-    constexpr const char* data() const noexcept { return chars; }
+    constexpr char*       data() noexcept { return _chars; }
+    constexpr const char* data() const noexcept { return _chars; }
     // Get the size of the string
     constexpr std::size_t size() const noexcept { return N; }
+
+    constexpr auto begin() noexcept { return data(); }
+    constexpr auto begin() const noexcept { return data(); }
+    constexpr auto end() noexcept { return data() + N; }
+    constexpr auto end() const noexcept { return data() + N; }
 
     // Default-compare
     constexpr bool operator==(const cx_str&) const noexcept = default;
@@ -58,12 +65,12 @@ struct cx_str {
     template <std::size_t O>
     constexpr cx_str<O + N> operator+(const cx_str<O>& other) const noexcept {
         cx_str<O + N> ret;
-        auto          o = ret.chars;
+        auto          o = ret._chars;
         for (auto i = 0u; i < N; ++i, ++o) {
-            *o = this->chars[i];
+            *o = this->_chars[i];
         }
         for (auto i = 0u; i < O; ++i, ++o) {
-            *o = other.chars[i];
+            *o = other._chars[i];
         }
         return ret;
     }
@@ -79,7 +86,7 @@ struct cx_str {
         return lmno::cx_str{arr} + self;
     }
 
-    constexpr char operator[](std::size_t off) const noexcept { return chars[off]; }
+    constexpr char operator[](std::size_t off) const noexcept { return _chars[off]; }
 };
 
 template <std::size_t N>
@@ -257,27 +264,23 @@ constexpr auto cx_fmt(const SizedStrings&... strings) {
     return ret;
 }
 
-template <cx_str Fmt, auto... SizedStrings>
-    requires(cx_sized_string<decltype(SizedStrings)> and ...)
+template <cx_str Fmt, cx_str... SizedStrings>
 constexpr auto cx_fmt_v = cx_fmt<Fmt>(SizedStrings...);
 
-template <cx_str Joiner, auto... SizedStrings>
+template <cx_str Joiner, cx_str... SizedStrings>
 constexpr auto cx_str_join_v = nullptr;
 
 template <cx_str Joiner>
 constexpr auto cx_str_join_v<Joiner> = cx_str{""};
 
-template <cx_str Joiner, auto First, auto... SizedStrings>
-    requires(cx_sized_string<decltype(First)>) and (cx_sized_string<decltype(SizedStrings)> and ...)
+template <cx_str Joiner, cx_str First, cx_str... SizedStrings>
 constexpr auto cx_str_join_v<Joiner, First, SizedStrings...>
     = cx_fmt_v<"{}{}", First, (cx_fmt_v<"{}{}", Joiner, SizedStrings> + ... + cx_str{""})>;
 
-template <auto S>
-    requires cx_sized_string<decltype(S)>
+template <cx_str S>
 constexpr auto quote_str_v = cx_fmt_v<"‘{}’", S>;
 
-template <cx_str S, auto Find, auto Replace>
-    requires(cx_sized_string<decltype(Find)> and cx_sized_string<decltype(Replace)>)
+template <cx_str S, cx_str Find, cx_str Replace>
 constexpr auto cx_str_replace() {
     constexpr auto newlen = detail::calc_replace_size(std::string_view(S),
                                                       std::string_view(Find),
@@ -302,6 +305,9 @@ constexpr auto cx_str_replace() {
     }
     return ret;
 }
+
+template <cx_str S, cx_str Find, cx_str Replace>
+constexpr auto cx_str_replace_v = cx_str_replace<S, Find, Replace>();
 
 #define LMNO_CX_STR(S)                                                                             \
     ::lmno::cx_str<(S).size()> { (S) }

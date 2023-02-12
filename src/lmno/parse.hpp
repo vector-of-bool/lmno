@@ -228,7 +228,7 @@ struct parser3 {
         } else if (c == '(') {
             it.pos++;
             parse_top(into, it);
-            if (it.get().str[0] != ')') {
+            if (it.get()[0] != ')') {
                 throw "Imbalanced parentheses";
             }
             it.pos++;
@@ -236,7 +236,7 @@ struct parser3 {
             it.pos++;
             parse_top(into, it);
             *into++ = {k_block, 0};
-            if (it.get().str[0] != '}') {
+            if (it.get()[0] != '}') {
                 throw "Imbalanced braces";
             }
             it.pos++;
@@ -264,7 +264,7 @@ struct parser3 {
 
     constexpr static auto parse_colon(node*& into, token_iter& it) {
         parse_strand(into, it);
-        while (it.get().str[0] == ':') {
+        while (it.get()[0] == ':') {
             it.pos++;
             parse_strand(into, it);
             *into++ = {k_train, 2};
@@ -277,8 +277,8 @@ struct parser3 {
             parse_colon(into, it);
             ++n_exprs;
             const token& tk = it.get();
-            char         c  = tk.str[0];
-            if (c == ':' or c == ')' or c == '.' or c == '}' or c == 0 or tk == "⋄" or tk == "←") {
+            char         c  = tk[0];
+            if (c == ':' or c == ')' or c == '.' or c == '}' or c == 0 or c == ';' or tk == "←") {
                 break;
             }
         }
@@ -292,11 +292,11 @@ struct parser3 {
         while (1) {
             parse_main(into, it);
             n_exprs++;
-            if (it.get().str[0] != '.') {
+            if (it.get()[0] != '.') {
                 break;
             }
             it.pos++;
-            if (it.get().str[0] == '.') {
+            if (it.get()[0] == '.') {
                 it.pos++;
                 continue;
             }
@@ -322,7 +322,7 @@ struct parser3 {
         while (1) {
             parse_assign(into, it);
             ++n_exprs;
-            if (it.get() != "⋄") {
+            if (it.get()[0] != ';') {
                 break;
             }
             it.pos++;

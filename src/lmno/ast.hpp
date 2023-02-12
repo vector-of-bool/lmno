@@ -65,7 +65,7 @@ template <typename... Elems>
 struct strand {};
 
 /**
- * @brief A sequence of expressions separated by diamonds "⋄"
+ * @brief A sequence of expressions separated by semicolon ";"
  *
  * @tparam Stmts The individual nodes
  */
@@ -93,7 +93,7 @@ template <typename AST>
 constexpr auto render_operand_v = cx_fmt_v<"({})", render_v<AST>>;
 
 template <token N>
-constexpr auto render_operand_v<name<N>> = cx_str<N.size()>{N.str};
+constexpr auto render_operand_v<name<N>> = cx_str<N.size()>{N.data()};
 
 template <typed_constant C>
 constexpr auto render_operand_v<C> = render_v<C>;
@@ -132,7 +132,7 @@ template <auto Value>
 constexpr auto render_integral(Const<Value>) noexcept {
     constexpr auto    NumDigits = n_chars_required(Value);
     cx_str<NumDigits> string;
-    auto              out = string.chars + NumDigits - 1;
+    auto              out = string.data() + NumDigits - 1;
     if (Value == 0) {
         *out = '0';
     }
@@ -157,7 +157,7 @@ constexpr auto render_template() {
 }  // namespace detail
 
 template <token N>
-constexpr auto render_v<name<N>> = cx_str<N.size()>(N.str);
+constexpr auto render_v<name<N>> = cx_str<N.size()>(N.data());
 
 template <typename T>
 constexpr auto render_constant_value_v = nullptr;
@@ -179,7 +179,7 @@ constexpr auto render_v<dyad<L, F, R>> = cx_fmt_v<"{} {} {}",
                                                   detail::render_dyad_rhs_v<R>>;
 
 template <typename... Stmts>
-constexpr auto render_v<stmt_seq<Stmts...>> = cx_str_join_v<" ⋄ ", render_v<Stmts>...>;
+constexpr auto render_v<stmt_seq<Stmts...>> = cx_str_join_v<" ; ", render_v<Stmts>...>;
 
 template <typename L>
 constexpr auto render_v<stmt_seq<L>> = render_v<L>;

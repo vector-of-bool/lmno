@@ -61,7 +61,7 @@ template <auto Value>
 constexpr auto render_integral() noexcept {
     constexpr auto    NumDigits = n_chars_required(Value);
     cx_str<NumDigits> string;
-    auto              out = string.chars + NumDigits - 1;
+    auto              out = string.data() + NumDigits - 1;
     if (Value == 0) {
         *out = '0';
     }

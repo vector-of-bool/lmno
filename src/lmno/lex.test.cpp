@@ -23,8 +23,8 @@ static_assert(
 
 using t3 = lex::tokenize_t<"1⊸⍳(˜∘)1⊸·/+⟜÷∘2⊸^">;
 
-static_assert(std::same_as<lex::tokenize_t<"foo(:I am a comment)bar">, token_list<"foo", "bar">>);
-static_assert(std::same_as<lex::tokenize_t<"foo(:I am a comment (with nested parentheses))bar">,
+static_assert(std::same_as<lex::tokenize_t<"foo(:I am a comment:)bar">, token_list<"foo", "bar">>);
+static_assert(std::same_as<lex::tokenize_t<"foo(:I am a comment (with nested parentheses):)bar">,
                            token_list<"foo", "bar">>);
 
 static_assert(std::same_as<lex::tokenize_t<"2⊸^">, token_list<"2", "⊸", "^">>);

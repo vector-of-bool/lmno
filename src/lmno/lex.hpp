@@ -4,12 +4,13 @@
 #include "./string.hpp"
 
 #include <array>
+#include <cassert>
 #include <string_view>
 #include <utility>
 
 namespace lmno::lex {
 
-constexpr static std::size_t max_token_length = 24;
+constexpr static std::size_t max_token_length = 23;
 
 /**
  * @brief Represents a LMNO token.
@@ -17,42 +18,34 @@ constexpr static std::size_t max_token_length = 24;
  * Structural and valid as a non-type template parameter
  */
 struct token {
-    char str[max_token_length] = {};
+    char _chars[max_token_length + 1] = {};
 
     constexpr token() = default;
 
     constexpr token(const char* s) {
-        auto dst = str;
+        auto        dst = _chars;
+        std::size_t n   = 0;
         while (*s) {
+            ++n;
+            assert(n <= max_token_length);
             *dst++ = *s++;
         }
     }
 
-    constexpr explicit operator std::string_view() const noexcept { return std::string_view(str); }
+    constexpr operator std::string_view() const noexcept { return std::string_view(_chars); }
 
-    constexpr std::size_t size() const noexcept { return std::char_traits<char>::length(str); }
+    constexpr const char* data() const noexcept { return _chars; }
+    constexpr std::size_t size() const noexcept { return std::char_traits<char>::length(_chars); }
+    constexpr char        operator[](std::size_t n) const noexcept {
+        assert(n < max_token_length);
+        return _chars[n];
+    }
 
     bool operator==(const token&) const = default;
 };
 
 template <token... Tokens>
-struct token_list {};
-
-template <>
-struct token_list<> {
-    static constexpr bool starts_with(auto) noexcept { return false; }
-    constexpr static bool empty = true;
-};
-
-template <token First, token... Tail>
-struct token_list<First, Tail...> {
-    static constexpr token head = First;
-    static constexpr auto  tail = token_list<Tail...>{};
-
-    static constexpr bool starts_with(token t) noexcept { return t == head; }
-
-    constexpr static bool empty = false;
-};
+struct token_list;
 
 constexpr bool is_digit(char c) { return c <= '9' and c >= '0'; }
 constexpr bool is_alpha(char c) { return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z'); }
@@ -65,7 +58,7 @@ using meta::list;
 constexpr auto fin_token(const char* s, std::size_t len) {
     token ret;
     for (auto i = 0u; i < len; ++i) {
-        ret.str[i] = s[i];
+        ret._chars[i] = s[i];
     }
     return ret;
 }
@@ -154,18 +147,15 @@ constexpr token_range next_token(const char* const begin, std::uint32_t start_po
                 // We're in a comment
                 it += 2;
                 pos += 2;
-                int depth = 0;
-                while (*it != ')' or depth > 0) {
-                    if (*it == '(')
-                        ++depth;
-                    else if (*it == ')')
-                        --depth;
-                    else if (not *it)
-                        throw "Unterminated comment in source string";
+                while (*it and (it[0] != ':' or it[1] != ')')) {
                     ++it;
                     ++pos;
                 }
-                ++pos;  // For final ')'
+                if (not *it) {
+                    throw "Unterminated comment in source string";
+                }
+                it += 2;
+                pos += 2;
                 return next_token(begin, pos);
             }
             // Other:
@@ -181,9 +171,9 @@ struct tokenize_result {
 };
 
 template <std::size_t N>
-constexpr tokenize_result<N> tokenize(const char* str) {
+constexpr tokenize_result<N> tokenize(const char* _chars) {
     tokenize_result<N> ret = {};
-    ret.num_tokens         = tokenize(ret.tokens.data(), str);
+    ret.num_tokens         = tokenize(ret.tokens.data(), _chars);
     return ret;
 }
 
