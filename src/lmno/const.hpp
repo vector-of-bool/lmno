@@ -37,15 +37,13 @@ struct Const : typed_constant_base {
         return static_cast<Other>(value);
     }
 
-    template <auto U>
-        requires neo::equality_comparable_with<type, decltype(U)>
-    [[nodiscard]] constexpr bool operator==(Const<U>) const noexcept {
-        return V == U;
+    template <neo::equality_comparable_with<type> U, U Vu>
+    [[nodiscard]] constexpr bool operator==(Const<Vu, U>) const noexcept {
+        return V == Vu;
     }
-    template <auto U>
-        requires neo::totally_ordered_with<type, decltype(U)>
-    [[nodiscard]] constexpr auto operator<=>(Const<U>) const noexcept {
-        return V <=> U;
+    template <neo::totally_ordered_with<type> U, U Vu>
+    [[nodiscard]] constexpr auto operator<=>(Const<Vu, U>) const noexcept {
+        return V <=> Vu;
     }
 
     [[nodiscard]] constexpr bool operator==(const type& t) const noexcept { return value == t; }
