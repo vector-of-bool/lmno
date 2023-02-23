@@ -11,7 +11,7 @@ struct typed_constant_base {};
 
 template <typename T>
 constexpr bool enable_typed_constant_v
-    = requires { requires static_cast<bool>(T::enable_typed_constant); };
+    = requires { requires(T::enable_typed_constant ? true : false); };
 
 /**
  * @brief Match any object which declares itself to be a typed constant and
