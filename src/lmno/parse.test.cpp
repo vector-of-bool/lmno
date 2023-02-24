@@ -22,16 +22,16 @@ static_assert(std::same_as<d, monad<name<"yo">, dyad<name<"hello">, name<"new">,
 using e = lmno::parse_t<"foo : bar baz">;
 static_assert(std::same_as<e, monad<monad<name<"foo">, name<"bar">>, name<"baz">>>);
 
-static_assert(std::same_as<parse_t<"foo .bar baz">, dyad<name<"foo">, name<"bar">, name<"baz">>>);
-static_assert(std::same_as<parse_t<"foo bar .baz quux">,
+static_assert(std::same_as<parse_t<"foo bar baz">, dyad<name<"foo">, name<"bar">, name<"baz">>>);
+static_assert(std::same_as<parse_t<"foo bar $baz$ quux">,
                            dyad<monad<name<"foo">, name<"bar">>, name<"baz">, name<"quux">>>);
 static_assert(
     std::same_as<
-        parse_t<"foo bar .baz:quux foo">,
+        parse_t<"foo bar $baz:quux$ foo">,
         dyad<monad<name<"foo">, name<"bar">>, monad<name<"baz">, name<"quux">>, name<"foo">>>);
 
 static_assert(
-    std::same_as<parse_t<"foo bar .. baz quux">,
+    std::same_as<parse_t<"foo bar $ baz quux">,
                  monad<monad<name<"foo">, name<"bar">>, monad<name<"baz">, name<"quux">>>>);
 
 static_assert(std::same_as<lmno::parse_t<"· add 5">, dyad<nothing, name<"add">, ConstInt64<5>>>);
@@ -46,10 +46,10 @@ static_assert(std::same_as<lmno::parse_t<"(foo bar) baz">,
 static_assert(std::same_as<lmno::parse_t<"foo : (bar) baz">,
                            monad<monad<name<"foo">, name<"bar">>, name<"baz">>>);
 
-static_assert(std::same_as<lmno::parse_t<"foo (bar) .. baz">,
+static_assert(std::same_as<lmno::parse_t<"foo (bar) $ baz">,
                            monad<monad<name<"foo">, name<"bar">>, name<"baz">>>);
 
-static_assert(std::same_as<lmno::parse_t<"foo {bar} .. baz">,
+static_assert(std::same_as<lmno::parse_t<"foo {bar} $ baz">,
                            monad<monad<name<"foo">, block<name<"bar">>>, name<"baz">>>);
 
 static_assert(std::same_as<lmno::parse_t<"foo ; bar">, stmt_seq<name<"foo">, name<"bar">>>);

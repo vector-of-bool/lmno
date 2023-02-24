@@ -278,7 +278,7 @@ struct parser3 {
             ++n_exprs;
             const token& tk = it.get();
             char         c  = tk[0];
-            if (c == ':' or c == ')' or c == '.' or c == '}' or c == 0 or c == ';' or tk == "←") {
+            if (c == ')' or c == '$' or c == '}' or c == 0 or c == ';' or tk == "←") {
                 break;
             }
         }
@@ -287,21 +287,15 @@ struct parser3 {
         }
     }
 
-    constexpr static void parse_dots(node*& into, token_iter& it) {
+    constexpr static void parse_money(node*& into, token_iter& it) {
         u64 n_exprs = 0;
         while (1) {
             parse_main(into, it);
             n_exprs++;
-            if (it.get()[0] != '.') {
+            if (it.get()[0] != '$') {
                 break;
             }
             it.pos++;
-            if (it.get()[0] == '.') {
-                it.pos++;
-                continue;
-            }
-            parse_colon(into, it);
-            ++n_exprs;
         }
         if (n_exprs > 1) {
             *into++ = {k_train, n_exprs};
@@ -309,10 +303,10 @@ struct parser3 {
     }
 
     constexpr static void parse_assign(node*& into, token_iter& it) {
-        parse_dots(into, it);
+        parse_money(into, it);
         if (it.get() == "←") {
             it.pos++;
-            parse_dots(into, it);
+            parse_money(into, it);
             *into++ = {k_assign, 0};
         }
     }
