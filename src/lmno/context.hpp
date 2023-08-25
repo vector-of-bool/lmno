@@ -152,15 +152,14 @@ struct scope<named_value<Names, Types>...> {
         using replace   = detail::replace_named<to_add, current>;
         using new_list  = replace::type;
         using keep_list = replace::keep;
-        using new_tuple = meta::rebind<new_list, detail::name_value_pairs>;
         return this->_bind_copy(static_cast<keep_list*>(nullptr),
-                                static_cast<new_tuple*>(nullptr),
+                                static_cast<new_list*>(nullptr),
                                 NEO_FWD(ps)...);
     }
 
     template <lex::token... Keep, typename... KeepTypes, typename... NewPairs, typename... AddPairs>
     constexpr auto _bind_copy(meta::list<named_value<Keep, KeepTypes>...>*,
-                              detail::name_value_pairs<NewPairs...>*,
+                              meta::list<NewPairs...>*,
                               AddPairs&&... ps) const noexcept {
         auto tup = detail::name_value_pairs<NewPairs...>{{this->template get<Keep>()}...,
                                                          {NEO_FWD(ps)}...};
