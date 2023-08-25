@@ -207,6 +207,9 @@ constexpr auto eval() -> decltype(eval<Parsed>()) {
     return eval<Parsed>();
 }
 
+template <cx_str CodeStr>
+constexpr auto eval_v = lmno::eval<CodeStr>();
+
 template <cx_str S, typename Sema = default_sema>
 using eval_t = decltype(NEO_DECLVAL(Sema).evaluate(default_context{}, parse_t<S>{}));
 
