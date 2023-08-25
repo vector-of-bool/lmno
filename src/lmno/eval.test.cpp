@@ -138,6 +138,9 @@ TEST_CASE("Cases") {
     // Assignment as the only statement: The name goes nowhere, but doesn't matter
     static_assert(eval<"foo ← 8">() == 8);
 
+    // Name reassignment: Just overrides the prior name
+    static_assert(eval<"foo ← 5; foo ← 42; foo">() == 42);
+
     // Compute the Nth inverse of a power of two:
     constexpr lmno::non_error auto fn [[maybe_unused]] = eval<"1⊸·/+⟜÷∘2⊸^ $ ∘ $ 1φ:↓⍳">();
     constexpr lmno::non_error auto quo = fn(63);
