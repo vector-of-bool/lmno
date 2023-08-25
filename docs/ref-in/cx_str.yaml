@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=schema.yaml#
+kind: class
+name: cx_str
+template: &N-template <std::size_t N>
+intro: |
+
+  The `cx_str` class template represents a array of `char` of fixed-length `N`
+  (`+1` for a null terminator).
+
+  The type is *structural*, *literal*, *regular*, fully :cpp:`constexpr`, and
+  valid as a non-type template parameter.
+
+  There is a (non-:cpp:`explicit`) |CTAD| deduction guide for a
+  reference-to-array-of-`char`, where `N` is deduced to be one less than the
+  length of the character array argument.
+
+contents:
+  Constructors:
+    - name: cx_str
+      desc: Construct a new `cx_str`
+      ent-page:
+        kind: ctor
+        name: cx_str
+        intro: |
+          All constructors are :cpp:`constexpr`
+        sigs:
+          - sig: cx_str() = default
+            desc: Default-construct a ``cx_str``. The string will be filled with `char{0}`.
+          - sig: cx_str(const char (&arr)[N+1]) noexcept
+            desc:
+              Construct a ``cx_str`` by copying from the given array of `char`.
+              This will only match arrays of the appropriate length (`N+1`)
+          - sig: cx_str(std::string_view sv) noexcept
+            desc: |
+              Copy `N` characters from the string-view `sv`.
+
+              .. note:: **Note**: `sv` must have ``size()`` of length `N`.
+
+                This is checked with an :cpp:`assert()`
+
+  Accessors:
+    - name: data
+      desc: Access the pointer to the underlying array
+      ent-page:
+        kind: fn
+        name: data
+        intro: Obtain a pointer to the beginning of the string's array of `char`.
+        sigs:
+          - data() noexcept -> char*
+          - data() const noexcept -> const char*
+    - name: size
+      desc: Get the size of the string
+      ent-page:
+        kind: fn
+        name: size
+        sigs: [size() const noexcept -> std::size_t]
+        intro: |
+          Always returns `N`. This function is defined to match other
+          string types and to satisfy `std::ranges::sized_range`
+
+    - name: range-access
+      desc: Access the begin/end of the string as a range
+      page:
+        title: Range Access
+        entities:
+          - kind: fn
+            name: range-access
+            sigs:
+              - begin()
+              - begin() const
+              - end()
+              - end() const
+            intro: |
+              Access the `cx_str` as a proper C++ range.
+
+              `cx_str` satisfies `std::ranges::contiguous_range`.

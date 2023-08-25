@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=schema.yaml
+title: "Header: ``<lmno/string.hpp>``"
+intro: |
+  The ``<lmno/string.hpp>`` header defines compile-time strings and string
+  handline utilities
+ns: lmno
+contents:
+  Classes:
+    - name: cx_str
+      desc: Fixed-length string, usable as a non-type template parameter
+      ent-page: !include cx_str.yaml
+
+  Variable Templates:
+    - name: cx_fmt_v
+      desc: Generate a compile-time formatted `cx_str` string
+      ent-page:
+        name: cx_fmt_v
+        kind: const
+        type: cx_str
+        template: <cx_str Format, cx_str... Items>
+        main: |
+          Generate a `cx_str` using a format-specifiying string `Format` to
+          interpolate `Items`.
+
+          :tparam Format:
+            The format-specifier string for the string interpolation.
+          :tparam Items:
+            The strings that will be inserted into the placeholders found
+            in `Format`.
+
+          The format-string `Format` is like that in `std::format`, but with a very reduced
+          featureset. The following format-specifiers may appear in `Format`:
+
+          - `"{}"` - Interpolate an item
+          - `"{:}"` - Interpolate an item. Equivalent to `"{}"`.
+          - `"{:'}"` - Interpolate the item, but wrapped it in single-quotes: ``‘ ’``
+
+          No other format-specifier syntax is supported.
+
+    - name: cx_str_join_v
+      desc: Join `cx_str`\ s using a joining infix string
+      ent-page:
+        name: cx_str_join_v
+        kind: const
+        type: cx_str
+        template: <cx_str Joiner, cx_str... Items>
+        main: |
+          Create a new `cx_str` that is the concatenation of all of `Items`, with the
+          `Joiner` string inserted between them::
+
+            static_assert(
+              cx_str_join_v<" : ", "foo", "bar", "baz"> == "foo : bar : baz");
+
+          If `Items` is empty, Evaluates to an empty string `cx_str{""}`. If `Items`
+          is a single string $S$, evaluates to $S$.
+
+    - name: cx_str_replace_v
+      desc: Replace occurances of a compile-time substring
+      ent-page:
+        name: cx_str_replace_v
+        kind: const
+        type: cx_str
+        template: <cx_str S, cx_str Find, cx_str Replace>
+        main: |
+          :tparam S: The input string to inspect
+          :tparam Find: The substring to search for within `S`
+          :tparam Replace: The string to splice into `S` in place of `Find`
+
+          Replace every instance of `Find` in `S` with `Replace`::
+
+            static_assert(
+              cx_str_replace_v<"foobarbaz", "bar", ", "> == "foo, baz");
+
+  Macros:
+    - name: LMNO_CX_STR
+      desc: Generate a `cx_str` from a compile-time `std::string`-like value
+      page:
+        title: "Macro: ``LMNO_CX_STR``"
+        ns: lmno
+        main: |
+          .. c:macro:: LMNO_CX_STR(S)
+
+            :param S:
+              A constant expression with a string-like interface. Must have a |constexpr| ``.size()``,
+              and a |constexpr| ``.data()``
+
+            This macro is useful to generate a `cx_str` from a |constexpr| string
+            where the |CTAD| guide of `cx_str` is not of any help::
+
+              constexpr std::string_view sv = calculate_string();
+              cx_str s = LMNO_CX_STR(sv);
+              // Expands to:
+              cx_str s = (::lmno::cx_str<(sv).size()>{(sv)});
+
+            .. note:: Beware that the ``S`` expression will be evaluated twice!

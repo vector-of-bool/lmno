@@ -1,0 +1,186 @@
+# yaml-language-server: $schema=https://json-schema.org/draft/2020-12/schema
+$id: reflink-schema
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Refpages Document
+description: A page for API references
+$defs:
+  GenericPage:
+    required: [page]
+    description: A generic page
+    properties:
+      page:
+        allOf:
+          - $ref: "#/$defs/PageCommon"
+          - required: [title]
+            properties:
+              title: &title
+                type: string
+                description: The title of the page
+
+  EntityPage:
+    required: [ent-page]
+    properties:
+      ent-page:
+        allOf:
+          - $ref: "#/$defs/PageCommon"
+          - $ref: "#/$defs/Entity"
+
+  PageCommon:
+    properties:
+      ns: &ns
+        type: string
+        description: The namespace of the page/entity. If unspecified, it is inherited from the parent
+      intro: &intro
+        type: string
+        description: |
+          An introductory paragraph for the page or entity. Inserted before the
+          contents-table or entities listing
+      main:
+        type: string
+        description: |
+          The main body content of the page/entity. Shown below the contents,
+          but before the entities listing.
+      contents:
+        type: object
+        description: |
+          A grouped set of sub-entities and sub-pages related to this object.
+        additionalProperties:
+          type: array
+          items: { $ref: "#/$defs/ContentItem" }
+      entities:
+        type: array
+        items: { $ref: "#/$defs/Entity" }
+
+  Entity:
+    required: [kind]
+    properties:
+      intro: *intro
+    oneOf:
+      - $ref: "#/$defs/StructEntity"
+      - $ref: "#/$defs/TypeEntity"
+      - $ref: "#/$defs/ClassEntity"
+      - $ref: "#/$defs/FuncEntity"
+      - $ref: "#/$defs/ConstructorEntity"
+      - $ref: "#/$defs/ConstEntity"
+      - $ref: "#/$defs/VarEntity"
+      - $ref: "#/$defs/ConceptEntity"
+
+  NamedEntity:
+    required: [name]
+    properties:
+      name:
+        type: string
+        description: The name of the entity within its namespace
+
+  StructEntity:
+    $ref: "#/$defs/NamedEntity"
+    properties:
+      template: &template
+        type: string
+        description: The template signature (if this is a templated entity)
+      kind:
+        const: struct
+
+  TypeEntity:
+    $ref: "#/$defs/NamedEntity"
+    properties:
+      kind:
+        const: type
+      template: *template
+      is: &ent-is
+        type: string
+        description: Declare the value of this entity
+
+  ClassEntity:
+    $ref: "#/$defs/NamedEntity"
+    properties:
+      kind:
+        const: class
+      template: *template
+
+  FuncEntity:
+    required: [sigs]
+    properties:
+      kind:
+        const: fn
+      sigs: &fn-sigs
+        kind: array
+        items: { $ref: "#/$defs/FuncSignature" }
+
+  ConstructorEntity:
+    required: [sigs]
+    properties:
+      kind:
+        const: ctor
+      sigs: *fn-sigs
+      template: *template
+
+  ConstEntity:
+    $ref: "#/$defs/NamedEntity"
+    properties:
+      kind:
+        const: const
+      is: *ent-is
+      template: *template
+
+  VarEntity:
+    $ref: "#/$defs/NamedEntity"
+    properties:
+      kind:
+        const: var
+      is: *ent-is
+      template: *template
+
+  ConceptEntity:
+    $ref: "#/$defs/NamedEntity"
+    required: [template]
+    properties:
+      kind:
+        const: concept
+      is: *ent-is
+      template: *template
+
+  FuncSignature:
+    anyOf:
+      - type: string
+      - type: object
+        required: [sig]
+        additionalProperties: false
+        properties:
+          sig:
+            type: string
+            description: The function signature (not including a template-head)
+          template: *template
+          desc:
+            type: string
+            description: A description of this particular signature's behavior
+
+  ContentItem:
+    type: object
+    required: [name, desc]
+    description: A contents-table entry
+    properties:
+      name:
+        type: string
+        description: The primary link text for this page/entity
+      desc:
+        type: string
+        description: A longer explanation of the linked page/entity
+      slug:
+        type: string
+        description: The spelling of the URL slug. Default is to reuse the name.
+    oneOf:
+      - $ref: "#/$defs/GenericPage"
+      - $ref: "#/$defs/EntityPage"
+
+oneOf:
+  - $ref: "#/$defs/GenericPage"
+  - $ref: "#/$defs/EntityPage"
+  - allOf:
+      - $ref: "#/$defs/PageCommon"
+      - required: [title]
+        properties:
+          title: *title
+  - allOf:
+      - $ref: "#/$defs/Entity"
+      - $ref: "#/$defs/PageCommon"

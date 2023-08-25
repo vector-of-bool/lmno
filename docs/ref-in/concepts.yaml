@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=schema.yaml
+$schema: file://schema.yaml
+title: "Header: ``<lmno/concepts.hpp>``"
+intro: |
+  The ``<lmno/concepts.hpp>`` header defines C++ |concept|\ s that are used by the library
+
+ns: lmno
+contents:
+  Concepts:
+    - name: stateless
+      desc: >-
+        A type that has no runtime state. (also: `enable_stateless_v`)
+      page:
+        title: "Concept: ``lmno::stateless``"
+        outro: |
+          .. rubric:: Footnotes
+          .. [#stateless-aggr]
+            To detect whether a non-empty aggregate type is stateless, one must
+            check that all of its non-static data members are also stateless.
+            This is currently implemented using Boost.PFR__, which is imperfect
+            in this detection.
+
+            __ https://github.com/boostorg/pfr
+
+            In particular: If we request `stateless` for a type ``T`` which is a
+            non-empty aggregate with any base classes, this will generate a
+            hard-error at compile-time, since PFR cannot handle this case in an
+            SFINAE-friendly manner.
+
+            If such a case is encountered, it is recommended to ensure the type
+            is empty (using ``[[no_unique_address]]``) if applicable, or to
+            explicitly tell |lmno| that the type is/isn't stateless by
+            specializing :var:`lmno::enable_stateless_v` for that type.
+
+        entities:
+          - kind: concept
+            template: <typename T>
+            name: stateless
+            intro: |
+              `T` is *stateless* if-and-only-if the following conditions are met:
+
+              1. `enable_stateless_v<T>` is `true`
+              2. OR:
+
+                 1. `enable_stateless_v` is *not* `false` for `T`,
+                 2. The type `T` is trivially-destructible,
+                 3. The type `T` is default-initializable,
+                 4. The expression `T{}` is valid in a constant-expression,
+                 5. And either:
+
+                    1. The type `T` is empty (according to `std::is_empty_v`)
+                    2. Or: The type `T` is an aggregate type *and* all non-static data
+                       members are also of `stateless` types [#stateless-aggr]_.
+
+          - kind: const
+            name: enable_stateless_v
+            template: <typename T>
+            type: constexpr auto
+            main: |
+              A customizable type-trait variable template that can be used to force a
+              given type `T` to be accepted/rejected as `stateless`. The default
+              value is unspecified, which allows `stateless` to do deeper inspection
+              on the given `T`.
+
+              - If `enable_stateless_v<T>` is `true`, then `stateless<T>` will *always*
+                be satisfied.
+
+              - If `enable_stateless_v<T>` is `false`, then `stateless<T>` will *never* be
+                satisified.
+    - name: structural
+      desc: A type that is valid as a non-type template parameter
+      ent-page:
+        kind: concept
+        name: structural
+        template: <typename T>
+        main: |
+          A type `T` is *structural* if it is valid as a non-type template parameter.
+
+          *Most* fundamental types are structural, including integers, floating-point types,
+          and arrays thereof. Additionally, class types that meet certain requirements
+          are also considered *structural*.
+
+          .. seealso::
+
+            For more information, refer to `the cppreference page about non-type template parameters`__
+
+            __ https://en.cppreference.com/w/cpp/language/template_parameters#Non-type_template_parameter
+
+    - name: typed_constant
+      desc: |-
+        A type that encodes a constant value (also: `typed_constant_base`, `enable_typed_constant_v`)
+      page:
+        title: "Concept: ``lmno::typed_constant``"
+        entities:
+          - kind: concept
+            name: typed_constant
+            template: <typename T>
+            main: |
+              Detects that the given type `T` represents a compile-time constant
+              value.
+
+              Is satisfied if-and-only-if:
+
+              1. `T` is derived from `typed_constant_base` OR `enable_typed_constant_v<T>` is `true`,
+              2. `stateless<T>` is `true`,
+              3. `T::type` names a type,
+              4. `T::type` satisfies `structural`,
+              5. `T::value` is an expression of type `T::type const&`,
+              6. and an instance of `T` can be explicitly-converted to `T::type`.
+
+          - kind: struct
+            name: typed_constant_base
+            main: A simple empty type that can be used to tag a class as a typed constant
+          - kind: const
+            name: enable_typed_constant_v
+            template: <typename T>
+            type: constexpr bool
+            main: |
+              If the expression `T::enabled_typed_constant` is a valid expression and is
+              contextually convertible to a `bool` value $B$, has the value $B$. Otherwise, `false`.
+
+  Alias Templates:
+    - name: unconst_t
+      desc: Strip away a `typed_constant` type
+      ent-page:
+        kind: type
+        template: <typename T, __exposition_t Ot = std::remove_cvref_t<T>>
+        name: unconst_t
+        main: |
+          With `Ot` being defined as `std::remove_cvref_t<T>`, if the type `Ot`
+          satisifes `typed_constant`, resolves to the type `Ot::type const&`.
+          Otherwise, resolves to `T`.
+
+          .. seealso:: `unconst`
+
+  Functions:
+    - name: unconst()
+      slug: unconst
+      desc: Strip away a `typed_constant` value
+      ent-page:
+        kind: fn
+        name: unconst
+        sigs:
+          - sig: auto unconst(T&& x) -> unconst_t<T>
+            template: <__deduced_t T>
+        main: |
+          `unconst` is an invocable object that accepts a single parameter. The
+          template parameter `T` cannot be provided explicitly.
+
+          :returns: `static_cast<unconst_t<T>&&>(x)`

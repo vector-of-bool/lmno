@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=schema.yaml
+title: "Header: ``<lex/const.hpp>``"
+intro: |
+  The ``<lex/const.hpp>`` header defines a type for encoding compile-time constant
+  values as distinct types.
+ns: lmno
+contents:
+  Class Templates:
+    - name: Const
+      desc: Encode a compile-time constant as a type
+      ent-page:
+        name: Const
+        template: <auto V, typename Type = __deduced_t>
+        kind: struct
+        intro: |
+          The class-template `Const<V>` is used to generate a unique type for any
+          given value `V`.
+
+          `V` may be a value of any type suitable for use as a non-type template parameter.
+          (That is: `V` must be `structural`.)
+
+          :tparam V: The value that is encoded in the new typ e
+          :tparam Type: The deduced type of `V`. **DO NOT** provide this argument
+            explicitly! Always allow it to be inferred from the type of `V`.
+        contents:
+          Constructors:
+            - name: Const() = default
+              slug: Const
+              desc: Construct an instance of `Const`.
+              ent-page:
+                name: Const
+                kind: ctor
+                sigs: [constexpr Const() noexcept = default]
+                intro:
+                  Construct a new instance of the `Const` type. For any given value
+                  parameter `V`, all instances of `Const<V>` are equivalent.
+          Member Types:
+            - name: type
+              desc: The type of the constant value
+              ent-page:
+                name: type
+                kind: type
+                intro: "`type` is the unqualified type of the template parameter `V`"
+
+          Static Member Variables:
+            - name: value
+              desc: The value encoded by this type
+              ent-page:
+                name: value
+                kind: const
+                type: static constexpr const type&
+                intro: A reference-to-const referring to `V`.
+
+          Operators:
+            - name: operator ⟨type⟩
+              slug: convert
+              desc: Convert the constant to another type
+              page:
+                title: Conversion Operators
+                entities:
+                  - kind: fn
+                    name: operator other
+                    sigs:
+                      - sig: explicit operator type const&() const noexcept
+                        desc: Bind to a reference to the associated type (Returns `value`)
+                      - sig: explicit operator Other() const
+                        template: <std::constructible_from<const type&> Other>
+                        desc: |
+                          Explicitly convert the wrapped `value` to an instance of
+                          `Other`. `Other` must be constructible from `const type&`.
+            - name: operator==
+              desc: Equality-compare constants
+              ent-page:
+                kind: fn
+                name: operator==
+                sigs:
+                  - sig: bool operator==(const type& t) const noexcept
+                    desc: Equality-compare against a runtime value. Compares ``t`` with `value`.
+                  - sig: bool operator==(Const<Uv, U>) const
+                    template: >-
+                      <std::equality_comparable_with<type> U, U Uv>
+                    desc: |
+                      Compare-for-equality with another arbitrary `Const` object which may have
+                      a different value or type. Only applicable if the other type is
+                      equality-comparable with `type`.
+            - name: operator<=>
+              desc: Order-compare constants
+              ent-page:
+                kind: fn
+                name: operator<=>
+                sigs:
+                  - sig: auto operator<=>(const type& t) const noexcept -> __deduced_t
+                    desc:
+                      Compare with a runtime value of `type`. Compares `value` with ``t``.
+                      The comparison category result is deduced.
+                  - sig: auto operator<=>(Const<Uv, U>) const noexcept -> __deduced_t
+                    template: <std::totally_ordered_with<type> U, U Uv>
+                    desc: Compare `value` with `Uv`. Requires that `U` is totally ordered with `type`.
+
+  Alias Templates:
+    - name: ConstInt64
+      desc: Generates a `Const` with type `std::int64_t`
+      ent-page:
+        kind: type
+        name: ConstInt64
+        template: <std::int64_t N>
+        main: |
+          This is a convenience type-alias that generates a `Const<N>` type.
+
+          By default, `Const` deduces the type of its template argument. This
+          can lead to "unexpected" results, as `Const<0>` is not the same type
+          as `Const<0ull>`. While they will *compare* as equivalent according
+          to `Const::operator==`, the compiler will treat them as different
+          types for the purpose of overload resolution.
+
+          |lmno| defaults to using `std::int64_t` for its integers, so `ConstInt64`
+          is defined as a convenience to synthesize a `Const` of the appropriate
+          type to match those that |lmno| would generate.

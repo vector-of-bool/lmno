@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=schema.yaml
+$schema: file://schema.yaml
+title: "Header: ``<lmno/invoke.hpp>``"
+intro: The ``<lmno/invoke.hpp>`` header provides utilities to invoke functions
+  and other invocable objects
+ns: lmno
+contents:
+  Functions:
+    - name: invoke()
+      slug: invoke
+      desc: Invoke an invocable object with a set of arguments
+      ent-page:
+        kind: fn
+        name: invoke
+        sigs:
+          - sig: constexpr auto invoke(F&& fn, Args&&... args) noexcept(__deduced_t) -> __deduced_t
+            template: >-
+              <__deduced_t F,
+              __deduced_t... Args,
+              __exposition_t... NormArgs>
+        main: |
+          Invokes an invocable object `fn` with the given arguments `args...`.
+
+          `invoke` is a function-like invocable object, and is not a function
+          template itself. The template parameters `F` and `Args` cannot be
+          provided explicitly.
+
+          `invoke` is `noexcept(true)` if a similar `std::invoke` call would be
+          well-formed and `noexcept(true)`
+
+          `invoke()` performs the following operations:
+
+          .. |StdInvoke| replace:: `std::invoke(unconst(FWD(fn)), static_cast<NormArgs>(args)...)`
+
+          1. Find the argument set `NormArgs...` for which
+             `std::invocable<F, NormArgs...>` is satisified:
+
+             1. If `std::invocable<unconst_t<F>, Args...>` is `true`, `NormArgs`
+                is `Args`.
+             2. Otherwise, attempt to apply `unconst_t` to each arg within
+                `Args`. Find the proper subset of `Args` with `unconst_t`
+                applied that results in `std::invocable` being satisifed for
+                `unconst_t<F>` with those modified arguments. If found,
+                `NormArgs` is that modified version of `Args`.
+             3. Otherwise, if `std::invocable<unconst_t<F>, unconst_t<Args>...>`
+                is `true`, `NormArgs` is `unconst_t<Args>...`
+             4. Otherwise, if `invoke_error_t<F, Args...>` names a type, return
+                a default-constructed instance of that type.
+             5. Otherwise, return an unspecified error type.
+
+          2. Let $R$ be the type of |StdInvoke|.
+          3. If `not stateless<F>` **or** `not (stateless<Args> && ...)` **or**
+             $R$ satisifes `stateless` **or** $R$ is not `structural` **or**
+             |StdInvoke| is *not* valid as a constant-expression, return
+             |StdInvoke|.
+          4. Otherwise: Return
+             `Const<std::invoke(unconst(FWD(fn)), static_cast<NormArgs>(args)...)>{}`.
+
+          .. seealso::
+
+            The background-discussion page :doc:`/background/invoke` explains
+            more about `invoke()` and why it behaves as it does.
+
+  Alias Templates:
+    - name: invoke_t
+      desc: Get the result type of a call to `invoke`
+      ent-page:
+        kind: type
+        name: invoke_t
+        template: <typename F, typename... Args>
+        is: decltype(invoke(std::declval<F>(), std::declval<Args>()...))
+        main: |
+          Resolves to the type that would be returned by a call to `invoke` with
+          arguments of type `F` and `Args...`.
+
+          .. note::
+
+            This will *always* resolve to a type, even if the direct
+            `std::invoke_result_t<F, Args...>` would be ill-formed. Refer to
+            :func:`invoke`.
+    - name: invoke_error_t
+      desc: Get the error-type for the given malformed invocation
+      ent-page:
+        kind: type
+        name: invoke_error_t
+        template: <typename F, typename... Args>
+        is: decltype(std::remove_cvref_t<unconst_t<F>>::template error<Args...>())
+  Concepts:
+    - name: invocable
+      desc: Match an invocation that will not generate an error with `invoke`
+      ent-page:
+        kind: concept
+        name: invocable
+        template: <typename F, typename... Args>
+        main: |
+          `invocable` is a concept similar to `std::invocable`. It will evaluate
+          to `true` if-and-only-if `invoke_t<F, Args...>` satisfies :concept:`err::non_error`.

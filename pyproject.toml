@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "lmno-dev"
+version = "0.0.0"
+description = "Development project for LMNO"
+authors = ["vector-of-bool <vectorofbool@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[tool.poetry.dev-dependencies]
+dagon = {extras = ["http"], version = "^0.10.1"}
+yapf = "^0.32.0"
+toml = "^0.10.2"
+pyright = "^1.1.290"
+
+[tool.poetry.group.dev.dependencies]
+sphinx-autobuild = "^2021.3.14"
+sphinx-math-dollar = "^1.2.1"
+pydata-sphinx-theme = "^0.12.0"
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 120
+
+[tool.pyright]
+typeCheckingMode = "strict"
+useLibraryCodeForTypes = true
+reportMissingTypeStubs = false
+reportMissingImports = true

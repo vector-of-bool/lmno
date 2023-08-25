@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=schema.yaml
+$schema: file://schema.yaml
+page:
+  title: C++ API Reference
+  contents:
+    Headers:
+      - name: <lmno/lex.hpp>
+        slug: lex
+        desc: Lexing and Tokenization
+        page: !include lex.yaml
+
+      - name: <lmno/const.hpp>
+        slug: const
+        desc: Types constants
+        page: !include const.yaml
+
+      - name: <lmno/string.hpp>
+        slug: string
+        desc: Compile-time strings and string handling
+        page: !include string.yaml
+
+      - name: <lmno/concepts.hpp>
+        slug: concepts
+        desc: "|lmno| Concepts"
+        page: !include concepts.yaml
+
+      - name: <lmno/invoke.hpp>
+        slug: invoke
+        desc: Function application and invocation utilities
+        page: !include invoke.yaml
+
+      - name: <lmno/error.hpp>
+        slug: error
+        desc: Error types and error handling
+        page: !include error.yaml
+
+    Other:
+      - name: Exposition
+        desc: Constructs that are only used for documentation purposes
+        slug: exposition
+        page:
+          title: Exposition-only Components
+          intro:
+            The entities described on this page are not actual, and are only used
+            in the documentation of other entities.
+          entities:
+            - name: __deduced_t
+              kind: type
+              is: __deduced_t
+              intro: |
+                This is a placeholder type within this reference material that
+                represents a type which is deduced from surrounding context. The
+                exact definition of this type that appears in a program should not
+                be relied on unless specified. It is rendered as `__deduced_t`.
+            - name: __impldef_t
+              kind: type
+              is: __impldef_t
+              intro: |
+                This is a docuemtnation placeholder type that represents a type
+                which is defined by the implementation, but has no reliable value
+                other than the name through which it was obtained. It is rendered
+                as `__impldef_t`
+            - name: __exposition_t
+              kind: type
+              is: __exposition_t
+              main: |
+                This type annotates an exposition-only type, and is not actually
+                present in the API, but is useful for defining other terms within
+                the API in which it appears. This construct is rendered as
+                `__exposition_t`.
+            - kind: fn
+              sigs:
+                - FWD(...)
+              main: |
+                This exposition-only function is equivalent to ``std::forward<decltype(X)>(X)``
+                for a given argument ``X``

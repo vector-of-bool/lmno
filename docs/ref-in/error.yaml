@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=schema.yaml
+$schema: file://schema.yaml
+title: "Header: ``<lmno/error.hpp>``"
+intro: |
+  ``<lmno/error.hpp>`` defines types, concepts, and utilities for defining and
+  handling errors
+ns: lmno::err
+contents:
+  Classes and Class Templates:
+    - name: error_base
+      desc: Base class for any error type
+      ent-page:
+        kind: class
+        name: error_base
+        main: |
+          An empty class intended for use in defining new error types. All
+          error types should publicly derived from `error_base`.
+    - name: error_type
+      desc: Class template of compile-time errors
+      ent-page:
+        kind: struct
+        name: error_type
+        template: <cx_str Message, typename Child = void>
+        intro: |
+          :Inherits from: `error_base`
+        entities:
+          - kind: type
+            name: child
+            is: Child
+            main: |
+              The type given for the `Child` template parameter.
+          - kind: const
+            name: message
+            type: static constexpr const auto&
+            is: Message
+            main: |
+              The error message string given by `Message`
+        main: |
+          `error_type` represents a compile-time error. The error message is
+          given by the `Message` template parameter. An error may have a "child"
+          error given by the `Child` parameter (default is `void`).
+
+          .. seealso::
+
+            - `fmt_error_t`: Generate an `error_type` using a format-string.
+
+  Type Aliases:
+    - name: fmt_error_t
+      desc: Generate an `error_type` from a compile-time format string
+      ent-page:
+        kind: type
+        name: fmt_error_t
+        template: <cx_str Format, cx_str... Items>
+        is: error_type<cx_fmt_v<Format, Items...>>
+    - name: fmt_errorex_t
+      desc: Generate an `error_type` with a child error and a compile-time format string
+      ent-page:
+        kind: type
+        name: fmt_errorex_t
+        template: <typename Child, cx_str Format, cx_str... Items>
+        is: error_type<cx_fmt_v<Format, Items...>, Child>
+
+  Concepts:
+    - name: any_error
+      desc: Match any type that is an error
+      ent-page:
+        kind: concept
+        name: any_error
+        template: <typename T>
+        is: std::derived_from<std::remove_cvref_t<T>, error_base>
+        main: |
+          Match any (cvr-qualified) type that derives from `error_base`. These
+          error types indicate compile-time errors, not runtime errors.
+    - name: non_error
+      desc: Match any type that is not an error
+      ent-page:
+        kind: concept
+        name: non_error
+        template: <typename T>
+        is: not any_error<T>
+        main: |
+          Match non-error types (any type that does not derive from `error_base`)

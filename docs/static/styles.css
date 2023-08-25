@@ -1,0 +1,129 @@
+@font-face {
+  font-family: BQN386 Unicode;
+  src: url(BQN386.woff2);
+}
+
+:root {
+  --mono-font: Consolas, Menlo, DejaVu Sans Mono, BQN386 Unicode, monospace;
+}
+
+code.code.highlight,
+div>div.highlight>pre,
+.sig.sig-inline {
+  font-family: var(--mono-font);
+  font-size: 0.8em;
+}
+
+body div.body {
+  font-size: 0.9em;
+}
+
+body div.body code {
+  font-size: 1.1em;
+}
+
+div.related code {
+  color: white;
+}
+
+code.lmno-name.literal>span.pre {
+  font-weight: bold;
+}
+
+p>code.lmno-name.literal>span.pre {
+  font-size: 13pt;
+}
+
+:not(div.grammar>pre>a)>code.literal:not(.lmno-name),
+.sig.sig-inline {
+  border: 1px solid #00000016;
+  padding: 1px 4px;
+  border-radius: 5px;
+  /* The background-border color comes from Furo styles */
+  background-color: var(--color-code-background);
+  /* color-mix(in srgb,  90%, transparent 10%); */
+  white-space: nowrap;
+}
+
+table.summary-table.mono-links tbody tr>:first-child p {
+  font-family: var(--mono-font);
+}
+
+:is(div, article, .body)[role="main"] section img {
+  border-radius: 5px;
+  box-shadow: 0 2px 3px #000e, 0 2px 10px #0005;
+}
+
+span.stricken {
+  text-decoration: line-through;
+}
+
+section dt.sig {
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+section dt.sig:not(:target) {
+  background-color: #0001;
+}
+
+section dt.sig:not(:first-child) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+section dt.sig:not(:last-of-type) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 1px solid #0002;
+}
+
+.table-wrapper.summary-table table.summary-table tr>*:first-child {
+  /* justify-self: end; */
+  text-align: right;
+}
+
+.table-wrapper.summary-table table.summary-table {
+  display: grid;
+  grid: auto / 1fr 2fr;
+}
+
+.table-wrapper.summary-table table.summary-table :is(thead, tbody, tr) {
+  display: contents;
+}
+
+.table-wrapper.summary-table table.summary-table {
+  margin-top: 10px;
+}
+
+.table-wrapper.summary-table table.summary-table tr :is(td, th) {
+  border-bottom: unset;
+  align-self: center;
+}
+
+a.reference.internal:is([title="__deduced_t"], [title="__impldef_t"], [title="__exposition_t"])>span.n {
+  display: none;
+}
+
+a.reference.internal:is([title="__deduced_t"], [title="__impldef_t"], [title="__exposition_t"])::before {
+  font-style: italic;
+  color: #777;
+  font-weight: bold;
+  font-family: Arial;
+}
+
+a.reference.internal[title="__deduced_t"]::before {
+  content: '⟨deduced⟩';
+}
+
+a.reference.internal[title="__impldef_t"]::before {
+  content: '⟨implementation-defined⟩';
+}
+
+a.reference.internal[title="__exposition_t"]::before {
+  content: '⟨exposition-only⟩';
+}
+
+dl.cpp.function>dt.sig-object:not(:first-child) {
+  margin-top: 5px;
+}
