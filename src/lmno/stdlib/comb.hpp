@@ -94,7 +94,7 @@ template <typename T>
 constexpr bool autoconst_v = lmno::arithmetic<T>;
 
 template <>
-constexpr bool autoconst_v<rational> = true;
+constexpr bool inline autoconst_v<rational> = true;
 
 template <auto V, typename T>
 constexpr bool autoconst_v<Const<V, T>> = autoconst_v<T>;
@@ -103,7 +103,7 @@ template <typename... Ts>
 constexpr bool autoconst_v<strand_range<Ts...>> = true;
 
 template <>
-constexpr bool autoconst_v<infinity> = true;
+constexpr bool inline autoconst_v<infinity> = true;
 
 /**
  * @brief If given an object that is marked as "auto-const", return a const_fn that will return that

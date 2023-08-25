@@ -55,6 +55,6 @@ struct valence_modifier : func_wrap<_valences> {};
 namespace lmno {
 
 template <>
-constexpr auto define<"⊘"> = stdlib::valence_modifier{};
+constexpr inline auto define<"⊘"> = stdlib::valence_modifier{};
 
 }  // namespace lmno
