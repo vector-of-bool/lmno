@@ -8,8 +8,7 @@ C++ library, and can be compiled and executed by a modern C++20 compiler.
 
    These docs, like |lmno| itself, are "experimental", and woefully incomplete.
    They will cover some aspects of |lmno| and the C++ library, but a lot remains
-   undocumented. Further documentation will be written in the future as the
-   language, library, and documentation style are solidified.
+   undocumented.
 
 .. toctree::
    :maxdepth: 2
