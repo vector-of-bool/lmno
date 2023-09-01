@@ -36,10 +36,10 @@ $ make docs
 $ make docs-server
 ```
 
-## Not on compiler support
+## Note on compiler support
 
 Currently, the only toolchains tested with this repository are GCC 11 and Clang
 16 . This repository features very heavy use of template metaprogramming and
 C++20 concepts. It is very likely that any compiler outside of those tested will
-reject the code, either due to compiler bugs in your compiler, or compilers bugs
-in the tested compilers that allowed malformed code to pass through.
+reject the code, either due to bugs in *your* compilers, or bugs in *my*
+compilers that allowed malformed code to pass through.
